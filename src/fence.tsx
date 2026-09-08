@@ -12,6 +12,7 @@
  *
  * Clicking a note reveals the SideNotes panel.
  */
+import codeBlockExamples from './codeBlockExamples.json'
 import { React, api } from './runtime'
 import type { FC } from 'react'
 import { fenceInt, parseFenceParams } from '@valley/plugin-sdk/fenceParams'
@@ -124,7 +125,7 @@ export function registerSideNotesFence(): () => void {
     ensureStyles()
     el.classList.add('sidenotes-fence')
     return api.ui.renderReact(el, <SideNotesFence code={code} path={ctx.path} />)
-  })
+  }, { examples: codeBlockExamples.sidenotes })
   return () => {
     off()
     document.getElementById(STYLE_ID)?.remove()
