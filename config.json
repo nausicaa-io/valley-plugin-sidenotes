@@ -1,0 +1,287 @@
+{
+  "icon": "sticky-note",
+  "main": "runtime/index.js",
+  "noteDocuments": [
+    {
+      "id": "notes",
+      "dataset": "notes",
+      "idColumn": "id",
+      "bodyColumn": "note",
+      "tags": {
+        "dataset": "note_tags",
+        "itemIdColumn": "noteId",
+        "valueColumn": "tag"
+      },
+      "sourcePathColumn": "path",
+      "updatedAtColumn": "updatedAt",
+      "navigation": {
+        "command": "sideNotes:open",
+        "itemIdArg": "id"
+      },
+      "label": "SideNotes",
+      "labelKey": "plugin.sideNotes.name",
+      "searchSourceId": "sidenotes",
+      "cardKind": "sidenote"
+    }
+  ],
+  "datasets": [
+    {
+      "id": "notes",
+      "store": "durable",
+      "version": 1,
+      "title": "Notes",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "text"
+        },
+        "path": {
+          "type": "text"
+        },
+        "url": {
+          "type": "text",
+          "nullable": true
+        },
+        "note": {
+          "type": "text"
+        },
+        "flagged": {
+          "type": "boolean"
+        },
+        "anchor": {
+          "type": "json"
+        },
+        "fileKey": {
+          "type": "json",
+          "nullable": true
+        },
+        "createdAt": {
+          "type": "datetime"
+        },
+        "updatedAt": {
+          "type": "datetime"
+        }
+      },
+      "indexes": [
+        {
+          "id": "path",
+          "columns": [
+            "path"
+          ]
+        },
+        {
+          "id": "url",
+          "columns": [
+            "url"
+          ]
+        },
+        {
+          "id": "notes_fts",
+          "columns": [
+            "note"
+          ],
+          "kind": "fts5"
+        }
+      ],
+      "visibility": "shared",
+      "titleKey": "auto.70440046a3dc"
+    },
+    {
+      "id": "note_tags",
+      "store": "durable",
+      "version": 1,
+      "title": "Note tags",
+      "primaryKey": [
+        "noteId",
+        "tag"
+      ],
+      "columns": {
+        "noteId": {
+          "type": "text"
+        },
+        "tag": {
+          "type": "text"
+        }
+      },
+      "relations": [
+        {
+          "kind": "foreign-key",
+          "columns": [
+            "noteId"
+          ],
+          "targetDataset": "notes",
+          "targetColumns": [
+            "id"
+          ],
+          "onDelete": "cascade"
+        }
+      ],
+      "titleKey": "auto.89180e1a25ef"
+    },
+    {
+      "id": "path_history",
+      "store": "durable",
+      "version": 1,
+      "title": "Path history",
+      "primaryKey": [
+        "noteId",
+        "position"
+      ],
+      "columns": {
+        "noteId": {
+          "type": "text"
+        },
+        "position": {
+          "type": "integer"
+        },
+        "path": {
+          "type": "text"
+        }
+      },
+      "relations": [
+        {
+          "kind": "foreign-key",
+          "columns": [
+            "noteId"
+          ],
+          "targetDataset": "notes",
+          "targetColumns": [
+            "id"
+          ],
+          "onDelete": "cascade"
+        }
+      ],
+      "titleKey": "auto.b32f39140566"
+    }
+  ],
+  "pathRefs": [
+    {
+      "source": "dataset",
+      "dataset": "sideNotes.notes",
+      "pathColumn": "path",
+      "fileKeyColumn": "fileKey",
+      "history": {
+        "dataset": "sideNotes.path_history",
+        "parentColumns": [
+          "id"
+        ],
+        "relatedColumns": [
+          "noteId"
+        ],
+        "positionColumn": "position",
+        "pathColumn": "path"
+      }
+    }
+  ],
+  "searchSources": [
+    {
+      "id": "sidenotes",
+      "label": "SideNotes",
+      "labelKey": "plugin.sideNotes.name",
+      "source": "dataset",
+      "dataset": "sideNotes.notes",
+      "fields": [
+        "note",
+        "url",
+        "tags"
+      ],
+      "joins": [
+        {
+          "dataset": "sideNotes.note_tags",
+          "baseColumns": [
+            "id"
+          ],
+          "relatedColumns": [
+            "noteId"
+          ],
+          "valueColumn": "tag",
+          "as": "tags"
+        }
+      ],
+      "mode": "tags",
+      "pathField": "path",
+      "display": [
+        "note"
+      ],
+      "default": true,
+      "cardKind": "sidenote",
+      "hintKey": "auto.97dcfe139228"
+    }
+  ],
+  "uiSlots": {
+    "right_sidebar": "sideNotes.panel",
+    "left_sidebar": "sideNotes.flagged"
+  },
+  "slotDefaults": {
+    "left_sidebar": {
+      "order": 70
+    },
+    "right_sidebar": {
+      "order": 60
+    }
+  },
+  "drivers": [
+    "notes"
+  ],
+  "provides": [
+    {
+      "id": "selection.textAction",
+      "kind": "extension",
+      "version": "1.0.0"
+    },
+    {
+      "id": "search.resultCard",
+      "kind": "extension",
+      "version": "1.0.0"
+    },
+    {
+      "id": "workspace.surface",
+      "kind": "extension",
+      "version": "1.0.0"
+    }
+  ],
+  "consumes": [
+    {
+      "id": "web.activeContext",
+      "kind": "state",
+      "range": "^1.0.0",
+      "optional": true
+    },
+    {
+      "id": "web.navigator",
+      "kind": "service",
+      "range": "^1.0.0",
+      "optional": true
+    }
+  ],
+  "settingsView": "sideNotes.settings",
+  "settingsSchema": {
+    "fields": [
+      {
+        "key": "mediaRangeSeconds",
+        "label": "Aware time range (seconds)",
+        "labelKey": "plugin.sideNotes.field.awareRange",
+        "type": "number",
+        "default": 10,
+        "description": "In Aware mode, audio/video notes within ± this many seconds of the current playback time are shown.",
+        "descriptionKey": "auto.204e47f6d7a2"
+      },
+      {
+        "key": "filterTypes",
+        "label": "Filter types",
+        "labelKey": "plugin.sideNotes.field.filterTypes",
+        "type": "chips",
+        "default": [
+          ".md",
+          ".mp3",
+          ".mp4",
+          ".pdf"
+        ],
+        "description": "File extensions available in the SideNotes filter. Add, remove or reorder them.",
+        "descriptionKey": "plugin.sideNotes.field.filterTypesDesc"
+      }
+    ]
+  }
+}
