@@ -29,3 +29,37 @@ Notes, tags, and path history are stored in the vault's plugin data. Updating th
 ## Requirements and updates
 
 Requires Valley desktop 0.1.0 or later and plugin API v4. Check for updates from the GitHub plugin detail page. Branch changes and updates are applied only when you choose them.
+
+## SideNotes for websites
+
+A web tab is a `main_workspace` plugin tab with **no vault file**, so the host's
+`activePath` is null while a site is focused. Surfing and SideNotes interact only
+through optional versioned contracts; either plugin works normally without the
+other.
+
+- **Active Web context.** `Page.tsx` publishes the focused tab's
+  `{instanceId,url,title}` through **`web.activeContext@1`** on mount / URL /
+  title change; the host clears the owner-attributed state on unload
+  (order-safe — a clear only fires if the instance still owns the context). Only the
+  active tab per pane mounts, so the published context tracks the focused site.
+  SideNotes reads it (`useActiveWebContext`) and, when no file is open, keys its
+  notes off the **normalized URL** (exact page; fragment stripped, host lowercased,
+  query kept) with the `web-selection` anchor.
+- **Selection capture.** The address-bar's note button reads the guest's current
+  text selection and lists compatible **`selection.textAction@1`** extensions for
+  the Web surface. SideNotes provides one action shared with the PDF selection
+  popover, keeps the draft in its own runtime store, and reveals its own panel.
+  With no provider the affordance is a harmless no-op.
+
+Clicking a Web note navigates through **`web.navigator@1`**. SideNotes never names
+Surfing or reaches into its source, commands or state.
+
+## Surface conventions
+
+- **A `white-space: nowrap` chip in a shrinking flex item needs `overflow: hidden` + `text-overflow: ellipsis`** — shrinking the box does not clip the text, so SideNotes' left-panel anchor pill drew straight over the card buttons beside it while the right panel's identical badge (which had the clip) was fine.
+- Flat To-Do and SideNotes sidebar lists keep separators between rows and beneath the final row. SideNotes flagged-note rows are full-bleed: the panel body has no horizontal padding, while the card keeps its content padding so normal separators and hover fills reach both panel edges.
+- Files auto-reveal uses the exact same crosshair geometry as SideNotes Aware mode. In the right SideNotes header, sorting precedes Create so Create remains the final action.
+
+## Development
+
+Use Node 24.19.0 and npm 11.17.0. Run `npm ci` and `npm run check` in this directory. The package owns its dependencies, tests, localization, and vendored SDK/tool/testkit archives; no Valley app checkout is required. `npm run check` validates imports, types, tests, and builds `runtime/index.js`. Commit rebuilt runtime files with source changes.

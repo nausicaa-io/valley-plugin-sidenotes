@@ -244,12 +244,12 @@ export const FlaggedPanel = (): ReactElement => {
           </button>
         </div>
       </div>
-      <div className="sidenote-search-bar sidenote-search-bar--left">
-        <Search className="sidenote-search-icon" />
-        <input className="sidenote-search-input" value={search} onChange={(e) => setSearch(e.target.value)}
+      <div className="sidenote-search-bar search-field">
+        <Search className="search-field-icon" />
+        <input className="search-field-input" value={search} onChange={(e) => setSearch(e.target.value)}
           placeholder={showAll ? uiText('auto.49cd864445a9') : uiText('auto.7c0451dde956')} aria-label={uiText('auto.ff4f3043a289')} />
         {search && (
-          <button className="sidenote-icon-btn sidenote-search-clear" onClick={() => setSearch('')} aria-label={uiText('auto.b667d6f9f635')}>
+          <button className="search-field-action" onClick={() => setSearch('')} aria-label={uiText('auto.b667d6f9f635')}>
             <X />
           </button>
         )}

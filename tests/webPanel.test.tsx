@@ -150,6 +150,30 @@ describe('SideNotes Panel — website subject', () => {
     setActiveWeb(mock, null)
   })
 
+  it.each([['right', Panel], ['left', FlaggedPanel]] as const)('keeps the %s search on the shared frame through typing and clearing', async (_surface, View) => {
+    sideNotesRecords(mock).push(webNote({ flagged: true }))
+    setActiveWeb(mock, { instanceId: 'web-1', url: 'https://example.com/docs', title: 'Docs' })
+    await act(async () => render(<View />))
+    expect(await screen.findByText('page note here')).toBeTruthy()
+    const frame = document.querySelector('.sidenote-search-bar') as HTMLElement
+    const input = within(frame).getByRole('textbox')
+    expect(frame).toHaveClass('search-field')
+    expect(input).toHaveClass('search-field-input')
+    expect(frame.querySelector('.search-field-icon')).not.toBeNull()
+    expect(within(frame).queryByRole('button')).toBeNull()
+    fireEvent.focus(input)
+    fireEvent.change(input, { target: { value: 'missing annotation' } })
+    await waitFor(() => expect(screen.queryByText('page note here')).toBeNull())
+    const clear = within(frame).getByRole('button')
+    expect(clear).toHaveClass('search-field-action')
+    expect(clear).not.toHaveClass('sidenote-icon-btn')
+    expect(input.parentElement).toBe(frame)
+    fireEvent.click(clear)
+    expect(input).toHaveValue('')
+    expect(await screen.findByText('page note here')).toBeTruthy()
+    expect(within(frame).queryByRole('button')).toBeNull()
+  })
+
   it('shows the page host + its notes when a website is active and no file is open', async () => {
     sideNotesRecords(mock).push(webNote())
     setActiveWeb(mock, { instanceId: 'web-1', url: 'https://example.com/docs', title: 'Docs' })

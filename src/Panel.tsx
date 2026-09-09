@@ -400,12 +400,12 @@ export const Panel = (): ReactElement => {
       </header>
       {hasSubject ? (
         <>
-          <div className="sidenote-search-bar">
-            <Search className="sidenote-search-icon" />
-            <input className="sidenote-search-input" value={search}
+          <div className="sidenote-search-bar search-field">
+            <Search className="search-field-icon" />
+            <input className="search-field-input" value={search}
               onChange={(e) => setSearch(e.target.value)} placeholder={uiText('auto.49cd864445a9')} aria-label={uiText('auto.f1b5671b118f')} />
             {search && (
-              <button className="sidenote-icon-btn sidenote-search-clear" onClick={() => setSearch('')} aria-label={uiText('auto.b667d6f9f635')}>
+              <button className="search-field-action" onClick={() => setSearch('')} aria-label={uiText('auto.b667d6f9f635')}>
                 <X />
               </button>
             )}

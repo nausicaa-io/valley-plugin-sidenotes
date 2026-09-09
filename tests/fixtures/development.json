@@ -1,0 +1,1037 @@
+{
+  "datasets": {
+    "notes": [
+      {
+        "id": "history-anchor-001",
+        "path": "Historical/Public technology chronicle 001.md",
+        "note": "Verify public source and counterpoint for chronicle 001.",
+        "flagged": true,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-002",
+        "path": "Historical/Public technology chronicle 002.md",
+        "note": "Verify public source and counterpoint for chronicle 002.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-003",
+        "path": "Historical/Public technology chronicle 003.md",
+        "note": "Verify public source and counterpoint for chronicle 003.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-004",
+        "path": "Historical/Public technology chronicle 004.md",
+        "note": "Verify public source and counterpoint for chronicle 004.",
+        "flagged": true,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-005",
+        "path": "Historical/Public technology chronicle 005.md",
+        "note": "Verify public source and counterpoint for chronicle 005.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-006",
+        "path": "Historical/Public technology chronicle 006.md",
+        "note": "Verify public source and counterpoint for chronicle 006.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-007",
+        "path": "Historical/Public technology chronicle 007.md",
+        "note": "Verify public source and counterpoint for chronicle 007.",
+        "flagged": true,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-008",
+        "path": "Historical/Public technology chronicle 008.md",
+        "note": "Verify public source and counterpoint for chronicle 008.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-009",
+        "path": "Historical/Public technology chronicle 009.md",
+        "note": "Verify public source and counterpoint for chronicle 009.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-010",
+        "path": "Historical/Public technology chronicle 010.md",
+        "note": "Verify public source and counterpoint for chronicle 010.",
+        "flagged": true,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-011",
+        "path": "Historical/Public technology chronicle 011.md",
+        "note": "Verify public source and counterpoint for chronicle 011.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-012",
+        "path": "Historical/Public technology chronicle 012.md",
+        "note": "Verify public source and counterpoint for chronicle 012.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-013",
+        "path": "Historical/Public technology chronicle 013.md",
+        "note": "Verify public source and counterpoint for chronicle 013.",
+        "flagged": true,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-014",
+        "path": "Historical/Public technology chronicle 014.md",
+        "note": "Verify public source and counterpoint for chronicle 014.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-015",
+        "path": "Historical/Public technology chronicle 015.md",
+        "note": "Verify public source and counterpoint for chronicle 015.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-016",
+        "path": "Historical/Public technology chronicle 016.md",
+        "note": "Verify public source and counterpoint for chronicle 016.",
+        "flagged": true,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-017",
+        "path": "Historical/Public technology chronicle 017.md",
+        "note": "Verify public source and counterpoint for chronicle 017.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-018",
+        "path": "Historical/Public technology chronicle 018.md",
+        "note": "Verify public source and counterpoint for chronicle 018.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-019",
+        "path": "Historical/Public technology chronicle 019.md",
+        "note": "Verify public source and counterpoint for chronicle 019.",
+        "flagged": true,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-020",
+        "path": "Historical/Public technology chronicle 020.md",
+        "note": "Verify public source and counterpoint for chronicle 020.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-021",
+        "path": "Historical/Public technology chronicle 021.md",
+        "note": "Verify public source and counterpoint for chronicle 021.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-022",
+        "path": "Historical/Public technology chronicle 022.md",
+        "note": "Verify public source and counterpoint for chronicle 022.",
+        "flagged": true,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-023",
+        "path": "Historical/Public technology chronicle 023.md",
+        "note": "Verify public source and counterpoint for chronicle 023.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-024",
+        "path": "Historical/Public technology chronicle 024.md",
+        "note": "Verify public source and counterpoint for chronicle 024.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:00:00.000Z",
+        "updatedAt": "2026-08-14T06:00:00.000Z"
+      },
+      {
+        "id": "history-anchor-001-observation",
+        "path": "Historical/Public technology chronicle 001.md",
+        "note": "Compare the observation with the linked public research question.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Observation"
+        },
+        "createdAt": "2026-08-14T06:05:00.000Z",
+        "updatedAt": "2026-08-14T06:05:00.000Z"
+      },
+      {
+        "id": "history-anchor-001-follow-up",
+        "path": "Historical/Public technology chronicle 001.md",
+        "note": "- [ ] Record one additional public institutional source.",
+        "flagged": true,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Source"
+        },
+        "createdAt": "2026-08-14T06:10:00.000Z",
+        "updatedAt": "2026-08-14T06:10:00.000Z"
+      },
+      {
+        "id": "steve-jobs-macintosh-promise",
+        "path": "Apple/The Macintosh.md",
+        "note": "Compare this promise with [[The Product Is the Promise]] and the pricing constraint described later in the note.",
+        "flagged": true,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "The promise"
+        },
+        "createdAt": "2026-08-14T07:00:00.000Z",
+        "updatedAt": "2026-08-14T07:00:00.000Z"
+      },
+      {
+        "id": "steve-jobs-macintosh-fact-check",
+        "path": "Apple/The Macintosh.md",
+        "note": "- [ ] Verify the June 1985 sales and layoff figures against the cited chronology.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "What I got wrong"
+        },
+        "createdAt": "2026-08-14T07:05:00.000Z",
+        "updatedAt": "2026-08-14T07:05:00.000Z"
+      },
+      {
+        "id": "steve-jobs-iphone-interface",
+        "path": "Apple/The iPhone.md",
+        "note": "The adaptable surface is the key product thesis here; compare it with [[What Simplicity Is Not]].",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "The one button"
+        },
+        "createdAt": "2026-08-14T07:10:00.000Z",
+        "updatedAt": "2026-08-14T07:10:00.000Z"
+      },
+      {
+        "id": "steve-jobs-iphone-rehearsal",
+        "path": "Apple/The iPhone.md",
+        "note": "Keep this as a concrete example for the presentation-craft thread.",
+        "flagged": true,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "The rehearsal"
+        },
+        "createdAt": "2026-08-14T07:15:00.000Z",
+        "updatedAt": "2026-08-14T07:15:00.000Z"
+      },
+      {
+        "id": "steve-jobs-returning-strategy",
+        "path": "Apple/Returning to Apple.md",
+        "note": "Use this as a counterexample to zero-sum strategy and link it from [[The Disease of More]].",
+        "flagged": true,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "Microsoft"
+        },
+        "createdAt": "2026-08-14T07:20:00.000Z",
+        "updatedAt": "2026-08-14T07:20:00.000Z"
+      },
+      {
+        "id": "steve-jobs-product-line-grid",
+        "path": "Apple/The Product Line Cut.md",
+        "note": "- [ ] Compare the four-quadrant grid with the product list before the cut.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "The grid"
+        },
+        "createdAt": "2026-08-14T07:25:00.000Z",
+        "updatedAt": "2026-08-14T07:25:00.000Z"
+      },
+      {
+        "id": "steve-jobs-next-continuity",
+        "path": "NeXT/Starting NeXT.md",
+        "note": "Trace the NeXTSTEP-to-macOS continuity in the operating-system timeline.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "What it actually was"
+        },
+        "createdAt": "2026-08-14T07:30:00.000Z",
+        "updatedAt": "2026-08-14T07:30:00.000Z"
+      },
+      {
+        "id": "steve-jobs-stanford-structure",
+        "path": "Archive/notes/Drafting the Stanford Address.md",
+        "note": "The three-story table is a reusable outline pattern; compare it with the final address.",
+        "flagged": false,
+        "anchor": {
+          "type": "markdown-heading",
+          "heading": "The structure that survived"
+        },
+        "createdAt": "2026-08-14T07:35:00.000Z",
+        "updatedAt": "2026-08-14T07:35:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-so-what",
+        "path": "Archive/Media/Pre-2000/so_what--miles_davis.mp3",
+        "note": "So What — released 1959.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-like-a-rolling-stone",
+        "path": "Archive/Media/Pre-2000/like_a_rolling_stone--bob_dylan.mp3",
+        "note": "Like a Rolling Stone — released 1965.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-space-oddity",
+        "path": "Archive/Media/Pre-2000/space_oddity--david_bowie.mp4",
+        "note": "Space Oddity — released 1969.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-imagine",
+        "path": "Archive/Media/Pre-2000/imagine--john_lennon.mp4",
+        "note": "Imagine — released 1971.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-speak-to-me",
+        "path": "Archive/Media/Pre-2000/speak_to_me--pink_floyd.mp3",
+        "note": "Speak to Me — released 1973.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-breathe",
+        "path": "Archive/Media/Pre-2000/breathe--pink_floyd.mp3",
+        "note": "Breathe — released 1973.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-on-the-run",
+        "path": "Archive/Media/Pre-2000/on_the_run--pink_floyd.mp3",
+        "note": "On the Run — released 1973.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-time",
+        "path": "Archive/Media/Pre-2000/time--pink_floyd.mp3",
+        "note": "Time — released 1973.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-the-great-gig-in-the-sky",
+        "path": "Archive/Media/Pre-2000/the_great_gig_in_the_sky--pink_floyd.mp3",
+        "note": "The Great Gig in the Sky — released 1973.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-money",
+        "path": "Archive/Media/Pre-2000/money--pink_floyd.mp3",
+        "note": "Money — released 1973.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-us-and-them",
+        "path": "Archive/Media/Pre-2000/us_and_them--pink_floyd.mp3",
+        "note": "Us and Them — released 1973.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-any-colour-you-like",
+        "path": "Archive/Media/Pre-2000/any_colour_you_like--pink_floyd.mp3",
+        "note": "Any Colour You Like — released 1973.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-brain-damage",
+        "path": "Archive/Media/Pre-2000/brain_damage--pink_floyd.mp3",
+        "note": "Brain Damage — released 1973.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-eclipse",
+        "path": "Archive/Media/Pre-2000/eclipse--pink_floyd.mp3",
+        "note": "Eclipse — released 1973.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-dreams",
+        "path": "Archive/Media/Pre-2000/dreams--marianne_beaulieu.mp4",
+        "note": "Dreams — Fleetwood Mac, 1977; this copy is performed by Marianne Beaulieu.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-running-up-that-hill",
+        "path": "Archive/Media/Pre-2000/running_up_that_hill--marianne_beaulieu.mp4",
+        "note": "Running Up That Hill — Kate Bush, 1985; this copy is performed by Marianne Beaulieu.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "sidenote-pre-2000-fuori-dal-mondo",
+        "path": "Archive/Media/Pre-2000/fuori_dal_mondo--ludovico_einaudi.mp3",
+        "note": "Fuori Dal Mondo — released 1999.",
+        "flagged": false,
+        "anchor": {
+          "type": "media-time",
+          "seconds": 0
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "design-pdf-good-design",
+        "path": "Design/10 Principles for Good Design.pdf",
+        "note": "Dieter Rams: ten principles for evaluating durable product design.",
+        "flagged": false,
+        "anchor": {
+          "type": "pdf-page",
+          "page": 1
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "design-pdf-presentation-genius",
+        "path": "Design/Das Präsentations-Genie Steve Jobs.pdf",
+        "note": "Presentation techniques associated with Steve Jobs, presented by Carmine Gallo.",
+        "flagged": false,
+        "anchor": {
+          "type": "pdf-page",
+          "page": 1
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "design-pdf-same-but-different",
+        "path": "Design/Same but Different - Classic Design and the Design of Change.pdf",
+        "note": "Architonic article on preserving and adapting classic design.",
+        "flagged": false,
+        "anchor": {
+          "type": "pdf-page",
+          "page": 1
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "design-pdf-business-mantras",
+        "path": "Design/7 Business Mantras I Learned from Steve Jobs.pdf",
+        "note": "Seven business lessons drawn from Steve Jobs.",
+        "flagged": false,
+        "anchor": {
+          "type": "pdf-page",
+          "page": 1
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      },
+      {
+        "id": "design-pdf-dark-truth",
+        "path": "Design/The Dark Truth about Steve Jobs.pdf",
+        "note": "Critical perspective on Steve Jobs by Mike Dent.",
+        "flagged": false,
+        "anchor": {
+          "type": "pdf-page",
+          "page": 1
+        },
+        "createdAt": "2026-09-01T12:00:00.000Z",
+        "updatedAt": "2026-09-01T12:00:00.000Z"
+      }
+    ],
+    "note_tags": [
+      {
+        "noteId": "history-anchor-001",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-002",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-003",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-004",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-005",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-006",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-007",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-008",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-009",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-010",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-011",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-012",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-013",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-014",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-015",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-016",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-017",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-018",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-019",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-020",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-021",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-022",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-023",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-024",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-001-observation",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-001-observation",
+        "tag": "comparison"
+      },
+      {
+        "noteId": "history-anchor-001-follow-up",
+        "tag": "public-history"
+      },
+      {
+        "noteId": "history-anchor-001-follow-up",
+        "tag": "follow-up"
+      },
+      {
+        "noteId": "steve-jobs-macintosh-promise",
+        "tag": "steve-jobs"
+      },
+      {
+        "noteId": "steve-jobs-macintosh-promise",
+        "tag": "product-design"
+      },
+      {
+        "noteId": "steve-jobs-macintosh-fact-check",
+        "tag": "steve-jobs"
+      },
+      {
+        "noteId": "steve-jobs-macintosh-fact-check",
+        "tag": "fact-check"
+      },
+      {
+        "noteId": "steve-jobs-iphone-interface",
+        "tag": "steve-jobs"
+      },
+      {
+        "noteId": "steve-jobs-iphone-interface",
+        "tag": "interface"
+      },
+      {
+        "noteId": "steve-jobs-iphone-rehearsal",
+        "tag": "steve-jobs"
+      },
+      {
+        "noteId": "steve-jobs-iphone-rehearsal",
+        "tag": "presentation"
+      },
+      {
+        "noteId": "steve-jobs-returning-strategy",
+        "tag": "steve-jobs"
+      },
+      {
+        "noteId": "steve-jobs-returning-strategy",
+        "tag": "strategy"
+      },
+      {
+        "noteId": "steve-jobs-product-line-grid",
+        "tag": "steve-jobs"
+      },
+      {
+        "noteId": "steve-jobs-product-line-grid",
+        "tag": "focus"
+      },
+      {
+        "noteId": "steve-jobs-next-continuity",
+        "tag": "steve-jobs"
+      },
+      {
+        "noteId": "steve-jobs-next-continuity",
+        "tag": "next"
+      },
+      {
+        "noteId": "steve-jobs-next-continuity",
+        "tag": "software"
+      },
+      {
+        "noteId": "steve-jobs-stanford-structure",
+        "tag": "steve-jobs"
+      },
+      {
+        "noteId": "steve-jobs-stanford-structure",
+        "tag": "writing"
+      },
+      {
+        "noteId": "sidenote-pre-2000-so-what",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-so-what",
+        "tag": "audio"
+      },
+      {
+        "noteId": "sidenote-pre-2000-like-a-rolling-stone",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-like-a-rolling-stone",
+        "tag": "audio"
+      },
+      {
+        "noteId": "sidenote-pre-2000-space-oddity",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-space-oddity",
+        "tag": "video"
+      },
+      {
+        "noteId": "sidenote-pre-2000-imagine",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-imagine",
+        "tag": "video"
+      },
+      {
+        "noteId": "sidenote-pre-2000-speak-to-me",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-speak-to-me",
+        "tag": "audio"
+      },
+      {
+        "noteId": "sidenote-pre-2000-breathe",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-breathe",
+        "tag": "audio"
+      },
+      {
+        "noteId": "sidenote-pre-2000-on-the-run",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-on-the-run",
+        "tag": "audio"
+      },
+      {
+        "noteId": "sidenote-pre-2000-time",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-time",
+        "tag": "audio"
+      },
+      {
+        "noteId": "sidenote-pre-2000-the-great-gig-in-the-sky",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-the-great-gig-in-the-sky",
+        "tag": "audio"
+      },
+      {
+        "noteId": "sidenote-pre-2000-money",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-money",
+        "tag": "audio"
+      },
+      {
+        "noteId": "sidenote-pre-2000-us-and-them",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-us-and-them",
+        "tag": "audio"
+      },
+      {
+        "noteId": "sidenote-pre-2000-any-colour-you-like",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-any-colour-you-like",
+        "tag": "audio"
+      },
+      {
+        "noteId": "sidenote-pre-2000-brain-damage",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-brain-damage",
+        "tag": "audio"
+      },
+      {
+        "noteId": "sidenote-pre-2000-eclipse",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-eclipse",
+        "tag": "audio"
+      },
+      {
+        "noteId": "sidenote-pre-2000-dreams",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-dreams",
+        "tag": "video"
+      },
+      {
+        "noteId": "sidenote-pre-2000-running-up-that-hill",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-running-up-that-hill",
+        "tag": "video"
+      },
+      {
+        "noteId": "sidenote-pre-2000-fuori-dal-mondo",
+        "tag": "pre-2000"
+      },
+      {
+        "noteId": "sidenote-pre-2000-fuori-dal-mondo",
+        "tag": "audio"
+      },
+      {
+        "noteId": "design-pdf-good-design",
+        "tag": "design"
+      },
+      {
+        "noteId": "design-pdf-good-design",
+        "tag": "pdf"
+      },
+      {
+        "noteId": "design-pdf-presentation-genius",
+        "tag": "design"
+      },
+      {
+        "noteId": "design-pdf-presentation-genius",
+        "tag": "pdf"
+      },
+      {
+        "noteId": "design-pdf-same-but-different",
+        "tag": "design"
+      },
+      {
+        "noteId": "design-pdf-same-but-different",
+        "tag": "pdf"
+      },
+      {
+        "noteId": "design-pdf-business-mantras",
+        "tag": "design"
+      },
+      {
+        "noteId": "design-pdf-business-mantras",
+        "tag": "pdf"
+      },
+      {
+        "noteId": "design-pdf-dark-truth",
+        "tag": "design"
+      },
+      {
+        "noteId": "design-pdf-dark-truth",
+        "tag": "pdf"
+      }
+    ],
+    "path_history": []
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "sourceRevision": "d935272e79dcc485e5414f254746456ebef1d7be",
+  "plugins": {
+    "sideNotes": [
+      {
+        "id": "sidenotes-v1",
+        "source": "sidenotes.jsonl",
+        "format": "jsonl",
+        "dataset": "notes",
+        "transforms": [
+          {
+            "operation": "retire",
+            "column": "completed",
+            "type": "boolean"
+          },
+          {
+            "operation": "default",
+            "column": "flagged",
+            "value": false
+          },
+          {
+            "operation": "explode",
+            "column": "tags",
+            "targetDataset": "note_tags",
+            "valueColumn": "tag"
+          },
+          {
+            "operation": "explode",
+            "column": "pathHistory",
+            "targetDataset": "path_history",
+            "valueColumn": "path",
+            "positionColumn": "position"
+          }
+        ],
+        "sqlPrecedence": {
+          "marker": "legacy:sidenotes-v1",
+          "emptyWithoutMarker": "reject"
+        }
+      }
+    ]
+  },
+  "sqlSchemas": {},
+  "fileStoreSchemas": {}
+}

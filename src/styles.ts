@@ -56,45 +56,8 @@ const CSS = `
 
 /* Search bar (right panel + left panel variants) */
 .sidenote-search-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border-light);
-  flex-shrink: 0;
-}
-
-.sidenote-search-bar--left {
-  margin: 0;
-}
-
-.sidenote-search-icon {
-  color: var(--text-tertiary);
-  flex-shrink: 0;
-  font-size:0.8125rem;
-}
-
-.sidenote-search-input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  color: var(--title-color);
-  font: inherit;
-  font-size: var(--small-font-size);
-  outline: none;
-}
-
-.sidenote-search-input::placeholder {
-  color: var(--text-tertiary);
-}
-
-.sidenote-search-clear {
-  opacity: 0.6;
-}
-
-.sidenote-search-clear:hover {
-  opacity: 1;
+  width: calc(100% - 2 * var(--space-2));
+  margin: var(--space-2);
 }
 
 /* Create form */
