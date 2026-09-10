@@ -28,7 +28,7 @@ Notes, tags, and path history are stored in the vault's plugin data. Updating th
 
 ## Requirements and updates
 
-Requires Valley desktop 0.1.0 or later and plugin API v4. Check for updates from the GitHub plugin detail page. Branch changes and updates are applied only when you choose them.
+Requires Valley desktop 0.1.0 or later and plugin API v5. Check for updates from the GitHub plugin detail page. Branch changes and updates are applied only when you choose them.
 
 ## SideNotes for websites
 
@@ -63,3 +63,5 @@ Surfing or reaches into its source, commands or state.
 ## Development
 
 Use Node 24.19.0 and npm 11.17.0. Run `npm ci` and `npm run check` in this directory. The package owns its dependencies, tests, localization, and vendored SDK/tool/testkit archives; no Valley app checkout is required. `npm run check` validates imports, types, tests, and builds `runtime/index.js`. Commit rebuilt runtime files with source changes.
+
+The package owns `locales/en.json`, `de.json`, `es.json`, `fr.json`, and `zh-CN.json`. Identity translations use `manifest.name` and `manifest.description`, including while disabled; fallback stays within the package’s English catalog. Authors and their URLs are paired arrays.
