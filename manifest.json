@@ -6,8 +6,12 @@
   "version": "1.1.2",
   "description": "Margin notes anchored to a file, a heading, a line, a PDF selection or a web page — with flags, tags and a cross-vault browser.",
   "descriptionKey": "plugin.sideNotes.desc",
-  "author": "Yanik",
-  "authorUrl": "https://github.com/yanik02",
+  "author": [
+    "Yanik"
+  ],
+  "authorUrl": [
+    "https://github.com/yanik02"
+  ],
   "isDesktopOnly": true,
   "minAppVersion": "0.1.0",
   "enabled": true
