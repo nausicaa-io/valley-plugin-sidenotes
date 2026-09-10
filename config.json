@@ -19,7 +19,7 @@
         "itemIdArg": "id"
       },
       "label": "SideNotes",
-      "labelKey": "plugin.sideNotes.name",
+      "labelKey": "manifest.name",
       "searchSourceId": "sidenotes",
       "cardKind": "sidenote"
     }
@@ -179,7 +179,7 @@
     {
       "id": "sidenotes",
       "label": "SideNotes",
-      "labelKey": "plugin.sideNotes.name",
+      "labelKey": "manifest.name",
       "source": "dataset",
       "dataset": "sideNotes.notes",
       "fields": [
@@ -283,5 +283,12 @@
         "descriptionKey": "plugin.sideNotes.field.filterTypesDesc"
       }
     ]
+  },
+  "locales": {
+    "en": "runtime/locales/en.json",
+    "de": "runtime/locales/de.json",
+    "es": "runtime/locales/es.json",
+    "fr": "runtime/locales/fr.json",
+    "zh-CN": "runtime/locales/zh-CN.json"
   }
 }

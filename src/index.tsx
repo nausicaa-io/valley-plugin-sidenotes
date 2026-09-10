@@ -73,7 +73,7 @@ export function register(api: ValleyPluginApi): () => void {
     sideEffect: 'read',
     run: () => {
       const path = api.getState().activePath
-      const detail = path && classifyFilePath(path) === 'pdf' ? extractFromSelection(path) : null
+      const detail = path && classifyFilePath(path) === 'pdf' ? extractFromSelection(path, api.workspace.getTextSelection()) : null
       if (detail) void capture({ surface: 'pdf', ...detail })
       return undefined
     }

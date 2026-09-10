@@ -2,10 +2,8 @@
   "apiVersion": 4,
   "id": "sideNotes",
   "name": "SideNotes",
-  "nameKey": "plugin.sideNotes.name",
   "version": "1.1.2",
   "description": "Margin notes anchored to a file, a heading, a line, a PDF selection or a web page — with flags, tags and a cross-vault browser.",
-  "descriptionKey": "plugin.sideNotes.desc",
   "author": [
     "Yanik"
   ],

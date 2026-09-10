@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { buildSelectionPrefill, resolvePdfSnippet } from '../src/highlights'
+import { buildSelectionPrefill, extractFromSelection, resolvePdfSnippet } from '../src/highlights'
+
+it('uses the host selection snapshot only for the matching PDF document', () => {
+  const selection = { surface: 'pdf' as const, path: 'paper.pdf', page: 3, text: 'A selected passage' }
+  expect(extractFromSelection('paper.pdf', selection)).toEqual({ path: 'paper.pdf', page: 3, text: 'A selected passage' })
+  expect(extractFromSelection('other.pdf', selection)).toBeNull()
+  expect(extractFromSelection('paper.pdf', { ...selection, surface: 'web' })).toBeNull()
+  expect(extractFromSelection('paper.pdf', null)).toBeNull()
+})
 
 describe('resolvePdfSnippet', () => {
   it('returns the exact page-text substring, ignoring whitespace differences', () => {

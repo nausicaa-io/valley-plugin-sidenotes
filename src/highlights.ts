@@ -1,4 +1,4 @@
-import type { PdfExtractDetail } from '@valley/plugin-sdk'
+import type { PdfExtractDetail, TextSelectionDetail } from '@valley/plugin-sdk'
 
 /** Case-preserving whitespace collapse — selections spanning lines carry `\n`s
  *  that would never match the space-joined PDF page text. */
@@ -56,16 +56,11 @@ export function buildSelectionPrefill(
 }
 
 /** Read the current DOM selection if it sits in a PDF text layer (hotkey path). */
-export function extractFromSelection(path: string): PdfExtractDetail | null {
-  const sel = window.getSelection()
-  if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null
-  const text = sel.toString().trim()
+export function extractFromSelection(path: string, selection: TextSelectionDetail | null): PdfExtractDetail | null {
+  if (selection?.surface !== 'pdf' || selection.path !== path) return null
+  const text = selection.text.trim()
   if (!text) return null
-  const start = sel.getRangeAt(0).startContainer
-  const el = start instanceof Element ? start : start.parentElement
-  const layer = el?.closest('.textLayer')
-  if (!layer) return null
-  const page = Number((layer.closest('.pdf-page') as HTMLElement | null)?.dataset.page)
+  const page = Number(selection.page)
   if (!Number.isFinite(page) || page < 1) return null
   return { path, page, text }
 }

@@ -54,7 +54,7 @@ export function useSideNoteSubject(path: string, url: string): void {
 function snapshot(surface: SlotId): PluginSurfaceSnapshot {
   const selected = state().selected.get(surface)
   const current = view(surface)
-  return { title: uiText('plugin.sideNotes.name'), view: current, ...(selected ? { item: { id: selected.id, title: selected.note.split('\n')[0].slice(0, 100), state: { ...current, noteId: selected.id } } } : {}) }
+  return { title: uiText('manifest.name'), view: current, ...(selected ? { item: { id: selected.id, title: selected.note.split('\n')[0].slice(0, 100), state: { ...current, noteId: selected.id } } } : {}) }
 }
 
 export function registerSideNoteSurfaces(pluginApi: ValleyPluginApi): () => void {
