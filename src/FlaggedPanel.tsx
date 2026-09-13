@@ -49,7 +49,7 @@ function compareNotes(a: SideNoteRecord, b: SideNoteRecord, field: SortField): n
 
 /** Cross-file flagged/all SideNotes browser — the plugin's `left_sidebar` view. */
 export const FlaggedPanel = (): ReactElement => {
-  const { notes, setNotes, loading } = useNotes()
+  const { notes, setNotes, loading, error, reload } = useNotes()
   const [search, setSearch] = useSideNoteViewField<string>('left_sidebar', 'search', '')
   const [showAll, setShowAll] = useSideNoteViewField<boolean>('left_sidebar', 'showAll', false)
   const [sortField, setSortField] = useSideNoteViewField<SortField>('left_sidebar', 'sortField', 'updated')
@@ -255,6 +255,7 @@ export const FlaggedPanel = (): ReactElement => {
         )}
       </div>
       <div className="panel-body flagged-notes-panel-body hidescrollbar">
+        {error && <div role="alert">{error} <button type="button" onClick={reload}>{uiText('sideNotes.action.retry')}</button></div>}
         {loading ? (
           <div className="tree-empty">{uiText('auto.33ce417454bf')}</div>
         ) : display.length === 0 ? (

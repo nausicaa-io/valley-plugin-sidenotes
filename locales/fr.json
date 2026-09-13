@@ -105,5 +105,7 @@
   "sideNotes.field.flagged": "Marquée",
   "sideNotes.field.note": "Annotation latérale",
   "sideNotes.field.tags": "Étiquettes",
-  "sideNotes.filter.web": "Site web"
+  "sideNotes.filter.web": "Site web",
+  "sideNotes.error.load": "Impossible de charger les SideNotes. Réessayez.",
+  "sideNotes.action.retry": "Réessayer"
 }

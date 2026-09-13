@@ -105,5 +105,7 @@
   "sideNotes.field.flagged": "Markiert",
   "sideNotes.field.note": "Anmerkung",
   "sideNotes.field.tags": "Tags",
-  "sideNotes.filter.web": "Internet"
+  "sideNotes.filter.web": "Internet",
+  "sideNotes.error.load": "SideNotes konnten nicht geladen werden. Versuche es erneut.",
+  "sideNotes.action.retry": "Erneut versuchen"
 }

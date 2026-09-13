@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from 'react'
 import { loadNotes, onChanged } from './data'
 import type { SideNoteRecord } from './types'
 import { WEB_ACTIVE_CONTEXT_V1, type ActiveWebContext } from '@valley/plugin-sdk'
+import { uiText } from './localization'
 
 /** The active workspace file path, kept fresh via the host state subscription. */
 export function useActivePath(): string | null {
@@ -33,21 +34,35 @@ export function useNotes(): {
   notes: SideNoteRecord[]
   setNotes: Dispatch<SetStateAction<SideNoteRecord[]>>
   loading: boolean
+  error: string | null
   reload: () => void
 } {
   const [notes, setNotes] = React.useState<SideNoteRecord[]>([])
   const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+  const active = React.useRef(false)
+  const generation = React.useRef(0)
   const reload = React.useCallback(() => {
+    if (!active.current) return
+    const current = ++generation.current
     void loadNotes().then((next) => {
+      if (!active.current || current !== generation.current) return
       setNotes(next)
+      setError(null)
+      setLoading(false)
+    }).catch(() => {
+      if (!active.current || current !== generation.current) return
+      setError(uiText('sideNotes.error.load'))
       setLoading(false)
     })
   }, [])
   React.useEffect(() => {
+    active.current = true
     reload()
-    return onChanged(reload)
+    const unsubscribe = onChanged(reload)
+    return () => { active.current = false; generation.current++; unsubscribe() }
   }, [reload])
-  return { notes, setNotes, loading, reload }
+  return { notes, setNotes, loading, error, reload }
 }
 
 /** Track in-flight mutation ids to prevent overlapping writes on a record. */

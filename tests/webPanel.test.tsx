@@ -63,6 +63,23 @@ describe('shared SideNote documents', () => {
   })
   afterEach(cleanup)
 
+  it('lets the reader retry a failed note-list load', async () => {
+    const dataset = mock.api.data.dataset
+    let fail = true
+    mock.api.data.dataset = ((id: string) => {
+      const handle = dataset(id)
+      return { ...handle, query: async (query) => {
+        if (id === 'sideNotes.notes' && fail) { fail = false; throw new Error('Read unavailable') }
+        return handle.query(query)
+      } }
+    }) as typeof dataset
+    render(<FlaggedPanel />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load SideNotes')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retry' })) })
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    expect(await loadNotes()).toHaveLength(1)
+  })
+
   it('saves shared Markdown and explicit tags atomically without rewriting inline tags', async () => {
     const [note] = await loadNotes()
     const update = vi.spyOn(mock.api.documents, 'update')

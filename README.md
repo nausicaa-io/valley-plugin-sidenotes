@@ -65,3 +65,5 @@ Surfing or reaches into its source, commands or state.
 Use Node 24.19.0 and npm 11.17.0. Run `npm ci` and `npm run check` in this directory. The package owns its dependencies, tests, localization, and vendored SDK/tool/testkit archives; no Valley app checkout is required. `npm run check` validates imports, types, tests, and builds `runtime/index.js`. Commit rebuilt runtime files with source changes.
 
 The package owns `locales/en.json`, `de.json`, `es.json`, `fr.json`, and `zh-CN.json`. Identity translations use `manifest.name` and `manifest.description`, including while disabled; fallback stays within the package’s English catalog. Authors and their URLs are paired arrays.
+
+Version 2.1 coalesces changes arriving during a pending note read into a fresh result. Panels retain loaded notes after a failed refresh, expose a localized Retry action, and ignore results completed after unmount.

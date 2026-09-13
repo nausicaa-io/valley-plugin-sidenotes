@@ -56,7 +56,7 @@ export const Panel = (): ReactElement => {
   const hasSubject = !!path || isWeb
   const subjectKey = isWeb ? `web:${subjectUrl}` : path
   useSideNoteSubject(path, subjectUrl)
-  const { notes, setNotes, loading } = useNotes()
+  const { notes, setNotes, loading, error, reload } = useNotes()
   const { isPending, setPending, pending } = usePending()
 
   const [draft, setDraft] = React.useState('')
@@ -430,6 +430,7 @@ export const Panel = (): ReactElement => {
             </div>
           )}
           <div className="sidenote-list">
+            {error && <div role="alert">{error} <button type="button" onClick={reload}>{uiText('sideNotes.action.retry')}</button></div>}
             {loading ? (
               <div className="right-sidebar-empty"><p>{uiText('auto.33ce417454bf')}</p></div>
             ) : display.length ? (

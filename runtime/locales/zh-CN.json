@@ -105,5 +105,7 @@
   "sideNotes.field.flagged": "已标记",
   "sideNotes.field.note": "注释",
   "sideNotes.field.tags": "标签",
-  "sideNotes.filter.web": "网页"
+  "sideNotes.filter.web": "网页",
+  "sideNotes.error.load": "无法加载 SideNotes。请重试。",
+  "sideNotes.action.retry": "重试"
 }

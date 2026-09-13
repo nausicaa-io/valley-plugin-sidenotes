@@ -157,11 +157,16 @@ async function relationDeletes(noteId: string): Promise<DatasetTransactionOperat
 }
 
 interface NoteLoadState {
+  revision: number
   pending: Promise<SideNoteRecord[]> | null
 }
 
 function noteLoadState(): NoteLoadState {
-  return api.runtime.getOrCreate('sideNotes.noteLoad', () => ({ pending: null }))
+  return api.runtime.getOrCreate('sideNotes.noteLoad', () => {
+    const state: NoteLoadState = { revision: 0, pending: null }
+    onChanged(() => { state.revision++ })
+    return state
+  })
 }
 
 async function readNotes(): Promise<SideNoteRecord[]> {
@@ -201,7 +206,13 @@ async function readNotes(): Promise<SideNoteRecord[]> {
 export function loadNotes(): Promise<SideNoteRecord[]> {
   const state = noteLoadState()
   if (state.pending) return state.pending
-  const pending = readNotes()
+  const pending = (async () => {
+    for (;;) {
+      const revision = state.revision
+      const notes = await readNotes()
+      if (revision === state.revision) return notes
+    }
+  })()
   const clear = (): void => {
     if (state.pending === pending) state.pending = null
   }

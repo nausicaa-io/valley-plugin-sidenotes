@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_SURFACE_V1, SEARCH_RESULT_CARD_V1, type DatasetRecord } from '@valley/plugin-sdk'
-import { renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import type { DataRecord } from '@valley/plugin-sdk/types'
 import { createMockValleyApi, type MockValleyApi } from '@valley/plugin-testkit'
 import { initRuntime } from '../src/runtime'
@@ -34,6 +34,7 @@ import { registerSearchCard } from '../src/searchCard'
 import { register } from '../src/index'
 import { registerSideNoteSurfaces, useSideNoteViewField } from '../src/surfaces'
 import config from '../config.json'
+import { useNotes } from '../src/hooks'
 
 const now = '2026-06-01T12:00:00.000Z'
 
@@ -98,6 +99,58 @@ describe('sideNotes plugin data layer', () => {
       datasets: { 'sideNotes.notes': [], 'sideNotes.note_tags': [], 'sideNotes.path_history': [] }
     })
     initRuntime(mock.api)
+  })
+
+  it('merges mutations during a pending read into one complete follow-up', async () => {
+    sideNotesRecords(mock).push(seed())
+    const dataset = mock.api.data.dataset
+    let release!: () => void
+    const held = new Promise<void>((resolve) => { release = resolve })
+    let reads = 0
+    mock.api.data.dataset = ((id: string) => {
+      const handle = dataset(id)
+      return { ...handle, query: async (query) => {
+        const result = await handle.query(query)
+        if (id === 'sideNotes.notes' && ++reads === 1) await held
+        return result
+      } }
+    }) as typeof dataset
+    const first = loadNotes()
+    await waitFor(() => expect(reads).toBe(1))
+    for (let index = 0; index < 20; index++) await dataset('sideNotes.notes').upsert(seed({ note: `Update ${index}` }))
+    const peers = Array.from({ length: 20 }, () => loadNotes())
+    release()
+    const results = await Promise.all([first, ...peers])
+    expect(results.every((notes) => notes[0].note === 'Update 19')).toBe(true)
+    expect(reads).toBe(2)
+  })
+
+  it('exposes a retryable read error and ignores a read completed after unmount', async () => {
+    sideNotesRecords(mock).push(seed())
+    const dataset = mock.api.data.dataset
+    let fail = true
+    let release: (() => void) | undefined
+    mock.api.data.dataset = ((id: string) => {
+      const handle = dataset(id)
+      return { ...handle, query: async (query) => {
+        if (id === 'sideNotes.notes' && fail) { fail = false; throw new Error('Unavailable') }
+        const result = await handle.query(query)
+        if (id === 'sideNotes.notes' && release) await new Promise<void>((resolve) => { release = resolve })
+        return result
+      } }
+    }) as typeof dataset
+    const mounted = renderHook(useNotes)
+    await waitFor(() => expect(mounted.result.current).toMatchObject({ loading: false, error: 'Could not load SideNotes. Try again.' }))
+    act(() => mounted.result.current.reload())
+    await waitFor(() => expect(mounted.result.current.notes).toHaveLength(1))
+    expect(mounted.result.current.error).toBeNull()
+    release = () => undefined
+    const previous = mounted.result.current
+    act(() => mounted.result.current.reload())
+    await act(async () => {})
+    mounted.unmount()
+    await act(async () => { release?.() })
+    expect(mounted.result.current).toBe(previous)
   })
 
   it('appends, updates, and deletes through isolated datasets', async () => {

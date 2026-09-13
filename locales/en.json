@@ -105,5 +105,7 @@
   "sideNotes.field.flagged": "Flagged",
   "sideNotes.field.note": "Annotation",
   "sideNotes.field.tags": "Tags",
-  "sideNotes.filter.web": "Web"
+  "sideNotes.filter.web": "Web",
+  "sideNotes.error.load": "Could not load SideNotes. Try again.",
+  "sideNotes.action.retry": "Retry"
 }
