@@ -10,8 +10,10 @@ import type { SideNoteRecord } from './types'
  */
 export let React!: typeof import('react')
 export let api!: ValleyPluginApi
+export let runtimeGeneration = 0
 
 export function initRuntime(a: ValleyPluginApi): void {
+  runtimeGeneration++
   api = a
   React = a.React
 }

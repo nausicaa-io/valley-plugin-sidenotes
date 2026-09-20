@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { PLUGIN_SURFACE_V1, SEARCH_RESULT_CARD_V1, type DatasetRecord } from '@valley/plugin-sdk'
+import { PLUGIN_SURFACE_V1, SEARCH_RESULT_CARD_V1, TEXT_SELECTION_ACTION_V1, type DatasetRecord } from '@valley/plugin-sdk'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { DataRecord } from '@valley/plugin-sdk/types'
 import { createMockValleyApi, type MockValleyApi } from '@valley/plugin-testkit'
-import { initRuntime } from '../src/runtime'
+import { initRuntime, selectionDraftStore } from '../src/runtime'
 import {
   appendNote,
   deleteNote,
   loadNotes,
   makeNote,
   makeWebNote,
+  noteRepository,
   retargetNotes,
   shiftLines,
   updateNote
@@ -32,9 +33,10 @@ import { matchesSearch } from '../src/search'
 import { registerSideNoteCommands } from '../src/commands'
 import { registerSearchCard } from '../src/searchCard'
 import { register } from '../src/index'
-import { registerSideNoteSurfaces, useSideNoteViewField } from '../src/surfaces'
+import { registerSideNoteSurfaces, selectSideNote, useSideNoteViewField } from '../src/surfaces'
 import config from '../config.json'
 import { useNotes } from '../src/hooks'
+import type { NoteScope } from '../src/noteRepository'
 
 const now = '2026-06-01T12:00:00.000Z'
 
@@ -74,6 +76,35 @@ describe('SideNotes settings', () => {
     const keys = (api.registerView as unknown as { mock: { calls: [string][] } }).mock.calls.map(([key]) => key)
     expect(keys).toContain('sideNotes.settings')
     dispose()
+  })
+
+  it('retires registered file callbacks and pending selections with their originating session', async () => {
+    const first = createMockValleyApi({ manifest: { id: 'sideNotes', noteDocuments: config.noteDocuments } })
+    const renamed = vi.spyOn(first.api.files, 'onRenamed')
+    const shifted = vi.spyOn(first.api.files, 'onLineShift')
+    let finish!: (value: string) => void
+    vi.spyOn(first.api.workspace, 'getPdfPageText').mockImplementation(() => new Promise<string>((resolve) => { finish = resolve }))
+    const reveal = vi.spyOn(first.api.workspace, 'revealOwnPanel')
+    const dispose = register(first.api)
+    const drafts = selectionDraftStore()
+    const selection = first.api.interop.extensions.providers(TEXT_SELECTION_ACTION_V1)[0].extension
+    const pending = selection.run({ surface: 'pdf', path: 'A.pdf', page: 1, text: 'Selected text' })
+    const second = createMockValleyApi({ manifest: { id: 'sideNotes', noteDocuments: config.noteDocuments } })
+    initRuntime(second.api)
+    const foreign = vi.spyOn(second.api.data, 'dataset')
+    renamed.mock.calls[0][0]({ oldPath: 'A.pdf', newPath: 'B.pdf' })
+    shifted.mock.calls[0][0]({ path: 'A.md', fromLine: 1, delta: 2 })
+    initRuntime(first.api)
+    finish('Selected text on page')
+    await pending
+    expect(drafts.get()).toBeNull()
+    expect(reveal).not.toHaveBeenCalled()
+    expect(foreign).not.toHaveBeenCalled()
+    dispose()
+    const dataset = vi.spyOn(first.api.data, 'dataset')
+    renamed.mock.calls[0][0]({ oldPath: 'A.pdf', newPath: 'B.pdf' })
+    shifted.mock.calls[0][0]({ path: 'A.md', fromLine: 1, delta: 2 })
+    expect(dataset).not.toHaveBeenCalled()
   })
 })
 
@@ -262,6 +293,382 @@ describe('sideNotes plugin data layer', () => {
       )
     ).toBe(false)
     expect(mock.api.workspace.openFile).not.toHaveBeenCalled()
+  })
+})
+
+describe('SideNotes scoped repository', () => {
+  function fixture(rows: DatasetRecord[]) {
+    const mock = createMockValleyApi({
+      manifest: { id: 'sideNotes', noteDocuments: config.noteDocuments },
+      datasets: { 'sideNotes.notes': rows, 'sideNotes.note_tags': [], 'sideNotes.path_history': [] }
+    })
+    initRuntime(mock.api)
+    return mock
+  }
+
+  it('loads only matching bodies and relations while preserving noncanonical subjects and raw relation ids', async () => {
+    const mock = fixture([
+      seed({ id: ' raw-id ', path: '  Notes/A.md  ' }),
+      seed({ id: 'web', path: 'Notes/A.md', url: ' HTTPS://EXAMPLE.COM:443/a/../docs#part ', note: 'Web body' }),
+      seed({ id: 'other', path: 'Notes/B.md', note: 'Unrelated body' })
+    ])
+    mock.datasets.get('sideNotes.note_tags')!.push({ noteId: ' raw-id ', tag: 'proof' }, { noteId: 'web', tag: 'web' }, { noteId: 'other', tag: 'unrelated' })
+    mock.datasets.get('sideNotes.path_history')!.push({ noteId: ' raw-id ', position: 0, path: 'Old/A.md' })
+    const transaction = vi.spyOn(mock.api.data, 'transaction')
+    const dataset = mock.api.data.dataset
+    const reads: Array<{ id: string; query: Parameters<ReturnType<typeof dataset>['query']>[0] }> = []
+    mock.api.data.dataset = ((id: string) => {
+      const handle = dataset(id)
+      return { ...handle, query: async (query) => { reads.push({ id, query }); return handle.query(query) } }
+    }) as typeof dataset
+    const file = await loadNotes({ kind: 'file', path: 'Notes/A.md' })
+    expect(file).toMatchObject([{ id: 'raw-id', path: 'Notes/A.md', tags: ['proof'], pathHistory: ['Old/A.md'] }])
+    const web = await loadNotes({ kind: 'web', url: 'https://example.com/docs#new' })
+    expect(web).toMatchObject([{ id: 'web', url: 'https://example.com/docs', tags: ['web'] }])
+    expect(reads.filter(({ query }) => query?.select)).toHaveLength(1)
+    expect(reads.filter(({ id, query }) => id === 'sideNotes.notes' && !query?.select).map(({ query }) => query?.where)).toEqual([
+      { id: { in: [' raw-id '] } }, { id: { in: ['web'] } }
+    ])
+    expect(reads.filter(({ id }) => id !== 'sideNotes.notes').every(({ query }) => !!query?.where?.noteId)).toBe(true)
+    expect(transaction).not.toHaveBeenCalled()
+  })
+
+  it.each([999, 1000, 1001])('reads all %i related tags without loading other subjects', async (count) => {
+    const mock = fixture([seed(), seed({ id: 'other', path: 'Notes/B.md' })])
+    mock.datasets.get('sideNotes.note_tags')!.push(...Array.from({ length: count }, (_, index) => ({ noteId: 'sidenote_test', tag: `tag-${index}` })), { noteId: 'other', tag: 'unrelated' })
+    const [note] = await loadNotes({ kind: 'file', path: 'Notes/A.md' })
+    expect(note.tags).toHaveLength(count)
+    expect(note.tags).not.toContain('unrelated')
+  })
+
+  it('pages the subject catalog and keeps every body/relation key batch within the host limit', async () => {
+    const mock = fixture(Array.from({ length: 1001 }, (_, index) => seed({ id: `note-${String(index).padStart(4, '0')}` })))
+    const dataset = mock.api.data.dataset
+    const batches: number[] = []
+    let catalogPages = 0
+    mock.api.data.dataset = ((id: string) => {
+      const handle = dataset(id)
+      return { ...handle, query: async (query) => {
+        if (query?.select) catalogPages++
+        const condition = query?.where?.[id === 'sideNotes.notes' ? 'id' : 'noteId']
+        if (condition && typeof condition === 'object' && 'in' in condition && Array.isArray(condition.in)) {
+          batches.push(condition.in.length)
+          if (condition.in.length > 100) throw new Error('Host key limit exceeded')
+        }
+        return handle.query(query)
+      } }
+    }) as typeof dataset
+    expect(await loadNotes({ kind: 'file', path: 'Notes/A.md' })).toHaveLength(1001)
+    expect(catalogPages).toBe(2)
+    expect(batches).toHaveLength(33)
+    expect(Math.max(...batches)).toBe(100)
+  })
+
+  it('keeps scoped ordering equal to the full read with shuffled and normalized-colliding ids', async () => {
+    const rows = Array.from({ length: 205 }, (_, index) => seed({ id: `note-${String(index).padStart(3, '0')}`, path: index % 4 === 0 ? 'Notes/B.md' : 'Notes/A.md' }))
+    rows.push(seed({ id: ' note-100 ', path: ' Notes/A.md ' }), seed({ id: 'NOTE-100' }))
+    const mock = fixture(rows.reverse())
+    mock.datasets.get('sideNotes.note_tags')!.push({ noteId: ' note-100 ', tag: 'spaced' }, { noteId: 'note-100', tag: 'canonical' })
+    const all = await loadNotes()
+    expect(await loadNotes({ kind: 'file', path: 'Notes/A.md' })).toEqual(all.filter((note) => note.path === 'Notes/A.md' && !note.url))
+  })
+
+  it.each(['rows', 'bytes'])('does not retain an oversized subject catalog (%s) or truncate its result', async (bound) => {
+    const rows = bound === 'rows'
+      ? Array.from({ length: 4097 }, (_, index) => seed({ id: `note-${index}`, path: index === 4096 ? 'Notes/A.md' : 'Notes/B.md' }))
+      : [seed(), seed({ id: 'large', path: 'Notes/B.md', url: `https://example.com/${'a'.repeat(2 * 1024 * 1024)}` })]
+    const mock = fixture(rows)
+    const dataset = mock.api.data.dataset
+    let catalogPages = 0
+    mock.api.data.dataset = ((id: string) => {
+      const handle = dataset(id)
+      return { ...handle, query: async (query) => { if (query?.select) catalogPages++; return handle.query(query) } }
+    }) as typeof dataset
+    expect(await loadNotes({ kind: 'file', path: 'Notes/A.md' })).toHaveLength(1)
+    const previousPages = catalogPages
+    expect(await loadNotes({ kind: 'file', path: 'Notes/A.md' })).toHaveLength(1)
+    expect(catalogPages).toBe(previousPages * 2)
+  })
+
+  it('shares identical scopes, captures their values, and reruns one changed catalog after a burst', async () => {
+    const mock = fixture([seed()])
+    const dataset = mock.api.data.dataset
+    let release!: () => void
+    const held = new Promise<void>((resolve) => { release = resolve })
+    let bodyReads = 0
+    mock.api.data.dataset = ((id: string) => {
+      const handle = dataset(id)
+      return { ...handle, query: async (query) => {
+        const result = await handle.query(query)
+        if (id === 'sideNotes.notes' && !query?.select && ++bodyReads === 1) await held
+        return result
+      } }
+    }) as typeof dataset
+    const scope: NoteScope = { kind: 'file', path: 'Notes/A.md' }
+    const first = loadNotes(scope)
+    scope.path = 'Notes/B.md'
+    await waitFor(() => expect(bodyReads).toBe(1))
+    for (let index = 0; index < 20; index++) await dataset('sideNotes.notes').upsert(seed({ note: `Latest ${index}` }))
+    const peers = Array.from({ length: 20 }, () => loadNotes({ kind: 'file', path: 'Notes/A.md' }))
+    expect(peers.every((promise) => promise === first)).toBe(true)
+    release()
+    const results = await Promise.all([first, ...peers])
+    expect(results.every((notes) => notes === results[0] && notes[0].note === 'Latest 19')).toBe(true)
+    expect(bodyReads).toBe(2)
+  })
+
+  it('settles every accepted relation read before releasing a failed shared request', async () => {
+    const mock = fixture([seed()])
+    const dataset = mock.api.data.dataset
+    let release!: () => void
+    const held = new Promise<void>((resolve) => { release = resolve })
+    let fail = true
+    let historyReads = 0
+    mock.api.data.dataset = ((id: string) => {
+      const handle = dataset(id)
+      return { ...handle, query: async (query) => {
+        if (id === 'sideNotes.note_tags' && fail) throw new Error('Tags unavailable')
+        if (id === 'sideNotes.path_history' && ++historyReads === 1) await held
+        return handle.query(query)
+      } }
+    }) as typeof dataset
+    const scope = { kind: 'file' as const, path: 'Notes/A.md' }
+    const pending = loadNotes(scope)
+    const rejected = expect(pending).rejects.toThrow('Tags unavailable')
+    await waitFor(() => expect(historyReads).toBe(1))
+    expect(loadNotes(scope)).toBe(pending)
+    release()
+    await rejected
+    fail = false
+    expect(await loadNotes(scope)).toHaveLength(1)
+    expect(historyReads).toBe(2)
+  })
+
+  it('bounds distinct pending scopes and releases capacity after settlement', async () => {
+    const mock = fixture([seed()])
+    const dataset = mock.api.data.dataset
+    let release!: () => void
+    const held = new Promise<void>((resolve) => { release = resolve })
+    mock.api.data.dataset = ((id: string) => {
+      const handle = dataset(id)
+      return { ...handle, query: async (query) => { if (query?.select) await held; return handle.query(query) } }
+    }) as typeof dataset
+    const accepted = Array.from({ length: 32 }, (_, index) => loadNotes({ kind: 'file', path: `Notes/${index}.md` }))
+    await expect(loadNotes({ kind: 'file', path: 'Notes/overflow.md' })).rejects.toThrow('Too many SideNotes reads')
+    release()
+    await Promise.all(accepted)
+    expect(await loadNotes({ kind: 'file', path: 'Notes/A.md' })).toHaveLength(1)
+  })
+
+  it('prevents a replaced reader from dispatching the next page or returning after A→B→A', async () => {
+    const mock = fixture(Array.from({ length: 1001 }, (_, index) => seed({ id: `note-${index}` })))
+    const dataset = mock.api.data.dataset
+    let release!: () => void
+    const held = new Promise<void>((resolve) => { release = resolve })
+    let reads = 0
+    mock.api.data.dataset = ((id: string) => {
+      const handle = dataset(id)
+      return { ...handle, query: async (query) => { reads++; const page = await handle.query(query); await held; return page } }
+    }) as typeof dataset
+    const pending = loadNotes({ kind: 'file', path: 'Notes/A.md' })
+    const rejected = expect(pending).rejects.toThrow('no longer active')
+    await waitFor(() => expect(reads).toBe(1))
+    fixture([])
+    initRuntime(mock.api)
+    release()
+    await rejected
+    expect(reads).toBe(1)
+    mock.api.data.dataset = dataset
+    expect(await loadNotes({ kind: 'file', path: 'Notes/A.md' })).toHaveLength(1001)
+  })
+
+  it('keeps registration idle with no selection and refreshes only captured selected items', async () => {
+    const mock = fixture([seed({ id: ' raw-id ' }), seed({ id: 'other', path: 'Notes/B.md' })])
+    const dispose = register(mock.api)
+    const dataset = mock.api.data.dataset
+    const bodyIds: string[][] = []
+    let reads = 0
+    mock.api.data.dataset = ((id: string) => {
+      const handle = dataset(id)
+      return { ...handle, query: async (query) => {
+        reads++
+        if (id === 'sideNotes.notes' && !query?.select) {
+          const condition = query?.where?.id
+          if (!condition || typeof condition !== 'object' || !('in' in condition)) throw new Error('Unscoped body refresh')
+          bodyIds.push(condition.in as string[])
+        }
+        return handle.query(query)
+      } }
+    }) as typeof dataset
+    await dataset('sideNotes.notes').upsert(seed({ id: 'other', path: 'Notes/B.md', note: 'Unselected edit' }))
+    expect(reads).toBe(0)
+    const [selected] = await loadNotes({ kind: 'ids', ids: ['raw-id'] })
+    selectSideNote(selected, 'right_sidebar')
+    bodyIds.length = 0
+    await dataset('sideNotes.notes').upsert(seed({ id: ' raw-id ', note: 'Selected edit' }))
+    const provider = mock.api.interop.extensions.providers(PLUGIN_SURFACE_V1).find((entry) => entry.extension.surface === 'right_sidebar')!
+    await waitFor(() => expect(provider.extension.getSnapshot().item?.title).toBe('Selected edit'))
+    expect(bodyIds).toEqual([[' raw-id ']])
+    dispose()
+  })
+
+  it('does not replace a newer selection when an older selected read settles', async () => {
+    const mock = fixture([seed(), seed({ id: 'new', path: 'Notes/B.md', note: 'New selection' })])
+    const dispose = registerSideNoteSurfaces(mock.api)
+    const [old, next] = await loadNotes()
+    selectSideNote(old, 'right_sidebar')
+    const dataset = mock.api.data.dataset
+    let release!: () => void
+    const held = new Promise<void>((resolve) => { release = resolve })
+    let reading = false
+    mock.api.data.dataset = ((id: string) => {
+      const handle = dataset(id)
+      return { ...handle, query: async (query) => {
+        const page = await handle.query(query)
+        if (id === 'sideNotes.notes' && !query?.select) { reading = true; await held }
+        return page
+      } }
+    }) as typeof dataset
+    await dataset('sideNotes.notes').upsert(seed({ note: 'Older updated selection' }))
+    await waitFor(() => expect(reading).toBe(true))
+    selectSideNote(next, 'right_sidebar')
+    release()
+    await act(async () => {})
+    const provider = mock.api.interop.extensions.providers(PLUGIN_SURFACE_V1).find((entry) => entry.extension.surface === 'right_sidebar')!
+    expect(provider.extension.getSnapshot().item?.title).toBe('New selection')
+    dispose()
+  })
+
+  it('disposes a captured reader without querying a revoked runtime and skips an empty subject', async () => {
+    const mock = fixture([seed()])
+    const repository = noteRepository()
+    const dataset = vi.spyOn(mock.api.data, 'dataset')
+    expect(await repository.load({ kind: 'none' })).toEqual([])
+    expect(dataset).not.toHaveBeenCalled()
+    const runtime = vi.spyOn(mock.api.runtime, 'getOrCreate').mockImplementation(() => { throw new Error('Revoked') })
+    repository.dispose()
+    repository.dispose()
+    await expect(repository.load()).rejects.toThrow('no longer active')
+    expect(runtime).not.toHaveBeenCalled()
+  })
+
+  it('keeps an old mounted reader from querying a replacement runtime after its dataset notification', async () => {
+    const first = fixture([seed({ note: 'First vault' })])
+    const mounted = renderHook(() => useNotes({ kind: 'file', path: 'Notes/A.md' }))
+    await waitFor(() => expect(mounted.result.current.notes[0]?.note).toBe('First vault'))
+    const second = fixture([seed({ note: 'Second vault' })])
+    const foreignReads = vi.spyOn(second.api.data, 'dataset')
+    await act(async () => { await first.api.data.dataset('sideNotes.notes').upsert(seed({ note: 'Late first vault edit' })) })
+    act(() => mounted.result.current.reload())
+    expect(foreignReads).not.toHaveBeenCalled()
+    expect(mounted.result.current.notes[0].note).toBe('First vault')
+    mounted.unmount()
+  })
+
+  it('keeps suspended surface restores and snapshot subscriptions bound to their original owner', async () => {
+    const first = fixture([seed({ note: 'First selection' })])
+    const offFirst = registerSideNoteSurfaces(first.api)
+    const old = first.api.interop.extensions.providers(PLUGIN_SURFACE_V1).find((entry) => entry.extension.surface === 'right_sidebar')!.extension
+    selectSideNote((await loadNotes())[0], 'right_sidebar')
+    let release!: () => void
+    const held = new Promise<void>((resolve) => { release = resolve })
+    const fileInfo = vi.spyOn(first.api.vault, 'fileInfo').mockImplementation(async () => { await held; return null })
+    const restoring = old.restore({ v: 1, path: 'Notes/A.md', search: 'Old restore' }, undefined, { background: true })
+    const rejected = expect(restoring).rejects.toThrow('no longer active')
+    await waitFor(() => expect(fileInfo).toHaveBeenCalledOnce())
+    const second = fixture([seed({ note: 'Second selection' })])
+    const offSecond = registerSideNoteSurfaces(second.api)
+    const current = second.api.interop.extensions.providers(PLUGIN_SURFACE_V1).find((entry) => entry.extension.surface === 'right_sidebar')!.extension
+    const oldListener = vi.fn()
+    const offListener = old.subscribe!(oldListener)
+    selectSideNote((await loadNotes())[0], 'right_sidebar')
+    expect(oldListener).not.toHaveBeenCalled()
+    release()
+    await rejected
+    expect(old.getSnapshot().item?.title).toBe('First selection')
+    expect(current.getSnapshot()).toMatchObject({ item: { title: 'Second selection' }, view: { search: '' } })
+    expect(first.api.workspace.openFile).not.toHaveBeenCalled()
+    expect(second.api.workspace.openFile).not.toHaveBeenCalled()
+    offListener()
+    offFirst()
+    offSecond()
+  })
+
+  it('captures bookmark inputs and prevents an older restore from replacing a later completed one', async () => {
+    const mock = fixture([])
+    const off = registerSideNoteSurfaces(mock.api)
+    const surface = mock.api.interop.extensions.providers(PLUGIN_SURFACE_V1).find((entry) => entry.extension.surface === 'right_sidebar')!.extension
+    let release!: () => void
+    const held = new Promise<void>((resolve) => { release = resolve })
+    const info = vi.spyOn(mock.api.vault, 'fileInfo').mockImplementation(async () => { await held; return { relPath: 'Notes/A.md' } as never })
+    const raw = { v: 1 as const, path: 'Notes/A.md', search: 'Captured' }
+    const options = { background: true }
+    const first = surface.restore(raw, undefined, options)
+    await waitFor(() => expect(info).toHaveBeenCalledOnce())
+    raw.path = 'Notes/B.md'
+    raw.search = 'Mutated'
+    options.background = false
+    release()
+    await first
+    expect(surface.getSnapshot().view).toMatchObject({ path: 'Notes/A.md', search: 'Captured' })
+    expect(mock.api.workspace.openFile).not.toHaveBeenCalled()
+
+    let finish!: () => void
+    const delayed = new Promise<void>((resolve) => { finish = resolve })
+    info.mockImplementation(async () => { await delayed; return { relPath: 'Notes/A.md' } as never })
+    const older = surface.restore({ v: 1, path: 'Notes/A.md', search: 'Older' }, undefined, { background: true })
+    const rejected = expect(older).rejects.toThrow('restore was replaced')
+    await waitFor(() => expect(info).toHaveBeenCalledTimes(2))
+    await surface.restore({ v: 1, search: 'Newer' }, undefined, { background: true })
+    finish()
+    await rejected
+    expect(surface.getSnapshot().view.search).toBe('Newer')
+    off()
+  })
+
+  it('does not publish a selected refresh when its owner changes after read resolution', async () => {
+    const mock = fixture([seed()])
+    const off = registerSideNoteSurfaces(mock.api)
+    const surface = mock.api.interop.extensions.providers(PLUGIN_SURFACE_V1).find((entry) => entry.extension.surface === 'right_sidebar')!.extension
+    const [original] = await loadNotes()
+    selectSideNote(original, 'right_sidebar')
+    const listener = vi.fn()
+    const unsubscribe = surface.subscribe!(listener)
+    let resolve!: (notes: SideNoteRecord[]) => void
+    const settled = new Promise<SideNoteRecord[]>((accept) => { resolve = accept })
+    void settled.then(() => { fixture([]) })
+    vi.spyOn(noteRepository(), 'load').mockReturnValue(settled)
+    await mock.api.data.dataset('sideNotes.notes').upsert(seed({ note: 'Updated' }))
+    resolve([{ ...original, note: 'Updated' }])
+    await settled
+    expect(surface.getSnapshot().item?.title).toBe(original.note)
+    expect(listener).not.toHaveBeenCalled()
+    unsubscribe()
+    off()
+  })
+
+  it('rejects old panel results when the subject changes and exposes the new loading state', async () => {
+    const mock = fixture([seed(), seed({ id: 'b', path: 'Notes/B.md', note: 'Second subject' })])
+    const dataset = mock.api.data.dataset
+    let release!: () => void
+    const held = new Promise<void>((resolve) => { release = resolve })
+    let first = true
+    mock.api.data.dataset = ((id: string) => {
+      const handle = dataset(id)
+      return { ...handle, query: async (query) => {
+        const result = await handle.query(query)
+        if (id === 'sideNotes.notes' && !query?.select && first) { first = false; await held }
+        return result
+      } }
+    }) as typeof dataset
+    const mounted = renderHook(({ path }) => useNotes({ kind: 'file', path }), { initialProps: { path: 'Notes/A.md' } })
+    await waitFor(() => expect(first).toBe(false))
+    mounted.rerender({ path: 'Notes/B.md' })
+    await waitFor(() => expect(mounted.result.current.notes[0]?.id).toBe('b'))
+    await act(async () => { release() })
+    expect(mounted.result.current.notes[0].id).toBe('b')
+    expect(mounted.result.current).toMatchObject({ loading: false, error: null })
+    mounted.unmount()
   })
 })
 

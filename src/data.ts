@@ -1,8 +1,9 @@
 import type { DataRecord } from '@valley/plugin-sdk/types'
-import type { DatasetRecord, DatasetTransactionOperation, DatasetWhere, NoteInputProps } from '@valley/plugin-sdk'
-import { api } from './runtime'
+import type { DatasetRecord, DatasetTransactionOperation, DatasetWhere, NoteInputProps, ValleyPluginApi } from '@valley/plugin-sdk'
+import { api, runtimeGeneration } from './runtime'
 import type { SideNoteAnchor, SideNoteFileKey, SideNoteRecord } from './types'
 import { normalizeUrl } from './web'
+import { NoteRepository, type NoteReadScope } from './noteRepository'
 
 const NOTES_DATASET = 'sideNotes.notes'
 const TAGS_DATASET = 'sideNotes.note_tags'
@@ -98,11 +99,50 @@ function normalize(raw: DataRecord): SideNoteRecord | null {
   }
 }
 
-async function withFileKey(record: SideNoteRecord): Promise<SideNoteRecord> {
-  // Web notes have no vault file to stat — leave them untouched.
+export interface NoteMutationSession {
+  readonly api: ValleyPluginApi
+  readonly reader: NoteRepository
+  isActive(): boolean
+  assertActive(): void
+}
+
+export function captureNoteMutation(owner: ValleyPluginApi = api, assertAllowed?: () => void): NoteMutationSession {
+  const generation = runtimeGeneration
+  const assertCurrent = (): void => {
+    assertAllowed?.()
+    if (owner !== api || generation !== runtimeGeneration) throw new Error('SideNotes mutation session is no longer active')
+  }
+  assertCurrent()
+  const reader = noteRepository()
+  return {
+    api: owner,
+    reader,
+    isActive: () => {
+      try { assertCurrent(); return reader.isActive() } catch { return false }
+    },
+    assertActive: () => {
+      assertCurrent()
+      if (!reader.isActive()) throw new Error('SideNotes mutation session is no longer active')
+    }
+  }
+}
+
+export function copyNote(record: SideNoteRecord): SideNoteRecord {
+  return {
+    ...record,
+    tags: [...record.tags],
+    pathHistory: [...record.pathHistory],
+    anchor: { ...record.anchor },
+    ...(record.fileKey ? { fileKey: { ...record.fileKey } } : {})
+  }
+}
+
+async function withFileKey(record: SideNoteRecord, session: NoteMutationSession): Promise<SideNoteRecord> {
+  session.assertActive()
   if (!record.path) return record
-  const key = await api.vault.stat(record.path)
-  return key ? { ...record, fileKey: key } : record
+  const key = await session.api.vault.stat(record.path)
+  session.assertActive()
+  return key ? { ...record, fileKey: { dev: key.dev, ino: key.ino } } : record
 }
 
 function noteRow(record: SideNoteRecord): DatasetRecord {
@@ -119,11 +159,13 @@ function noteRow(record: SideNoteRecord): DatasetRecord {
   }
 }
 
-async function allRows(dataset: string, where?: DatasetWhere): Promise<DatasetRecord[]> {
+async function allRows(session: NoteMutationSession, dataset: string, where?: DatasetWhere): Promise<DatasetRecord[]> {
   const rows: DatasetRecord[] = []
   let cursor: string | undefined
   do {
-    const page = await api.data.dataset(dataset).query({ where, limit: 1000, cursor })
+    session.assertActive()
+    const page = await session.api.data.dataset(dataset).query({ where, limit: 1000, cursor })
+    session.assertActive()
     rows.push(...page.rows)
     cursor = page.cursor
   } while (cursor)
@@ -145,80 +187,37 @@ function relationWrites(record: SideNoteRecord): DatasetTransactionOperation[] {
   ]
 }
 
-async function relationDeletes(noteId: string): Promise<DatasetTransactionOperation[]> {
-  const [tags, history] = await Promise.all([
-    allRows(TAGS_DATASET, { noteId }),
-    allRows(PATH_HISTORY_DATASET, { noteId })
+async function relationDeletes(session: NoteMutationSession, noteId: string): Promise<DatasetTransactionOperation[]> {
+  const results = await Promise.allSettled([
+    allRows(session, TAGS_DATASET, { noteId }),
+    allRows(session, PATH_HISTORY_DATASET, { noteId })
   ])
+  const failure = results.find((result) => result.status === 'rejected')
+  if (failure?.status === 'rejected') throw failure.reason
+  session.assertActive()
+  const [tags, history] = results.map((result) => (result as PromiseFulfilledResult<DatasetRecord[]>).value)
   return [
     ...tags.map((row) => ({ dataset: TAGS_DATASET, operation: 'delete' as const, key: { noteId, tag: String(row.tag) } })),
     ...history.map((row) => ({ dataset: PATH_HISTORY_DATASET, operation: 'delete' as const, key: { noteId, position: Number(row.position) } }))
   ]
 }
 
-interface NoteLoadState {
-  revision: number
-  pending: Promise<SideNoteRecord[]> | null
+export function noteRepository(): NoteRepository {
+  const owner = api
+  const generation = runtimeGeneration
+  const root = owner.getState().vault?.path ?? null
+  const slot = owner.runtime.getOrCreate('sideNotes.noteRepository', () => ({ current: null as NoteRepository | null }))
+  if (slot.current?.isActive()) return slot.current
+  slot.current?.dispose()
+  slot.current = new NoteRepository(owner, () => {
+    if (owner !== api || generation !== runtimeGeneration) return false
+    try { return (owner.getState().vault?.path ?? null) === root } catch { return false }
+  }, (row) => normalize(row as DataRecord))
+  return slot.current
 }
 
-function noteLoadState(): NoteLoadState {
-  return api.runtime.getOrCreate('sideNotes.noteLoad', () => {
-    const state: NoteLoadState = { revision: 0, pending: null }
-    onChanged(() => { state.revision++ })
-    return state
-  })
-}
-
-async function readNotes(): Promise<SideNoteRecord[]> {
-  const [raw, tags, history] = await Promise.all([
-    allRows(NOTES_DATASET),
-    allRows(TAGS_DATASET),
-    allRows(PATH_HISTORY_DATASET)
-  ])
-  const tagsByNote = new Map<string, unknown[]>()
-  for (const entry of tags) {
-    const noteId = str(entry.noteId)
-    if (!noteId) continue
-    const values = tagsByNote.get(noteId)
-    if (values) values.push(entry.tag)
-    else tagsByNote.set(noteId, [entry.tag])
-  }
-  const historyByNote = new Map<string, DatasetRecord[]>()
-  for (const entry of history) {
-    const noteId = str(entry.noteId)
-    if (!noteId) continue
-    const values = historyByNote.get(noteId)
-    if (values) values.push(entry)
-    else historyByNote.set(noteId, [entry])
-  }
-  for (const values of historyByNote.values()) {
-    values.sort((a, b) => Number(a.position) - Number(b.position))
-  }
-  return raw
-    .map((row) => normalize({
-      ...row,
-      tags: tagsByNote.get(str(row.id)) ?? [],
-      pathHistory: (historyByNote.get(str(row.id)) ?? []).map((entry) => entry.path)
-    } as DataRecord))
-    .filter((note): note is SideNoteRecord => note !== null)
-}
-
-export function loadNotes(): Promise<SideNoteRecord[]> {
-  const state = noteLoadState()
-  if (state.pending) return state.pending
-  const pending = (async () => {
-    for (;;) {
-      const revision = state.revision
-      const notes = await readNotes()
-      if (revision === state.revision) return notes
-    }
-  })()
-  const clear = (): void => {
-    if (state.pending === pending) state.pending = null
-  }
-  state.pending = pending
-  void pending.then(clear, clear)
-  return pending
+export function loadNotes(scope?: NoteReadScope): Promise<SideNoteRecord[]> {
+  return noteRepository().load(scope)
 }
 
 export function makeNote(path: string, text: string, anchor: SideNoteAnchor, tags: string[] = []): SideNoteRecord {
@@ -253,10 +252,11 @@ export function makeWebNote(url: string, text: string, anchor: SideNoteAnchor, t
   }
 }
 
-export async function appendNote(record: SideNoteRecord): Promise<boolean> {
-  const next = await withFileKey(record)
+export async function appendNote(record: SideNoteRecord, session = captureNoteMutation()): Promise<boolean> {
+  const next = await withFileKey(copyNote(record), session)
   try {
-    await api.data.transaction([
+    session.assertActive()
+    await session.api.data.transaction([
       { dataset: NOTES_DATASET, operation: 'insert', values: noteRow(next) },
       ...relationWrites(next)
     ])
@@ -268,24 +268,33 @@ export async function appendNote(record: SideNoteRecord): Promise<boolean> {
 
 export type DocumentRevision = Parameters<NonNullable<NoteInputProps['onRevisionChange']>>[0]
 
-export async function updateNote(id: string, record: SideNoteRecord, expectedUpdatedAt?: string, documentRevision?: DocumentRevision): Promise<boolean> {
-  const next = await withFileKey({ ...record, id })
+export async function updateNote(id: string, record: SideNoteRecord, expectedUpdatedAt?: string, documentRevision?: DocumentRevision, session = captureNoteMutation()): Promise<boolean> {
+  const revision = documentRevision ? { ...documentRevision } : undefined
+  const next = await withFileKey({ ...copyNote(record), id }, session)
   try {
-    const ref = { pluginId: api.pluginId, sourceId: 'notes', itemId: id }
-    const baseline = await api.documents.read(ref)
+    session.assertActive()
+    const ref = { pluginId: session.api.pluginId, sourceId: 'notes', itemId: id }
+    const baseline = await session.api.documents.read(ref)
+    session.assertActive()
     if (!baseline) return false
-    if (expectedUpdatedAt !== undefined && (await api.data.dataset(NOTES_DATASET).get({ id }))?.updatedAt !== expectedUpdatedAt) return false
+    if (expectedUpdatedAt !== undefined) {
+      const current = await session.api.data.dataset(NOTES_DATASET).get({ id })
+      session.assertActive()
+      if (current?.updatedAt !== expectedUpdatedAt) return false
+    }
     const row = noteRow(next)
     delete row.id
     delete row.note
-    await api.documents.update(ref, {
-      expectedRevision: documentRevision?.expectedRevision ?? baseline.revision,
-      vaultGeneration: documentRevision?.vaultGeneration ?? baseline.vaultGeneration,
+    const deletes = await relationDeletes(session, id)
+    session.assertActive()
+    await session.api.documents.update(ref, {
+      expectedRevision: revision?.expectedRevision ?? baseline.revision,
+      vaultGeneration: revision?.vaultGeneration ?? baseline.vaultGeneration,
       body: next.note,
       explicitTags: next.tags,
       operations: [
         { dataset: NOTES_DATASET, operation: 'update', key: { id }, values: row },
-        ...(await relationDeletes(id)).filter((operation) => operation.dataset !== TAGS_DATASET),
+        ...deletes.filter((operation) => operation.dataset !== TAGS_DATASET),
         ...relationWrites(next).filter((operation) => operation.dataset !== TAGS_DATASET)
       ]
     })
@@ -295,44 +304,61 @@ export async function updateNote(id: string, record: SideNoteRecord, expectedUpd
   }
 }
 
-export async function deleteNote(id: string): Promise<boolean> {
+export async function deleteNote(id: string, session = captureNoteMutation()): Promise<boolean> {
   try {
-    return (await api.data.dataset(NOTES_DATASET).delete({ id })).affected > 0
+    session.assertActive()
+    return (await session.api.data.dataset(NOTES_DATASET).delete({ id })).affected > 0
   } catch {
     return false
   }
 }
 
 /** Retarget notes after an in-app rename/move (mirrors core retargetSideNotePaths). */
-export async function retargetNotes(oldPath: string, newPath: string): Promise<void> {
-  if (!oldPath || !newPath || oldPath === newPath) return
-  const notes = await loadNotes()
-  const prefix = `${oldPath}/`
-  for (const note of notes) {
-    if (note.path !== oldPath && !note.path.startsWith(prefix)) continue
-    const path = note.path === oldPath ? newPath : `${newPath}/${note.path.slice(prefix.length)}`
-    const next: SideNoteRecord = {
-      ...note,
-      path,
-      pathHistory: [note.path, ...note.pathHistory.filter((p) => p !== note.path)],
-      updatedAt: nowIso()
+export async function retargetNotes(oldPath: string, newPath: string, session = captureNoteMutation()): Promise<void> {
+  try {
+    if (!oldPath || !newPath || oldPath === newPath) return
+    session.assertActive()
+    const notes = await session.reader.load()
+    session.assertActive()
+    const prefix = `${oldPath}/`
+    for (const note of notes) {
+      if (note.path !== oldPath && !note.path.startsWith(prefix)) continue
+      const path = note.path === oldPath ? newPath : `${newPath}/${note.path.slice(prefix.length)}`
+      const next: SideNoteRecord = {
+        ...note,
+        path,
+        pathHistory: [note.path, ...note.pathHistory.filter((p) => p !== note.path)],
+        updatedAt: nowIso()
+      }
+      session.assertActive()
+      await updateNote(note.id, next, undefined, undefined, session)
+      session.assertActive()
     }
-    await updateNote(note.id, next)
+  } catch (error) {
+    if (session.isActive()) throw error
   }
 }
 
 /** Shift markdown-line anchors after a line insert/delete (mirrors core shiftSideNoteLines). */
-export async function shiftLines(path: string, fromLine: number, delta: number): Promise<void> {
-  if (!Number.isFinite(delta) || delta === 0 || !path) return
-  const start = Math.max(1, Math.floor(fromLine))
-  const notes = await loadNotes()
-  for (const note of notes) {
-    if (note.path !== path || note.anchor.type !== 'markdown-line' || note.anchor.line < start) continue
-    const next: SideNoteRecord = {
-      ...note,
-      anchor: { ...note.anchor, line: Math.max(1, note.anchor.line + delta) },
-      updatedAt: nowIso()
+export async function shiftLines(path: string, fromLine: number, delta: number, session = captureNoteMutation()): Promise<void> {
+  try {
+    if (!Number.isFinite(delta) || delta === 0 || !path) return
+    const start = Math.max(1, Math.floor(fromLine))
+    session.assertActive()
+    const notes = await session.reader.load()
+    session.assertActive()
+    for (const note of notes) {
+      if (note.path !== path || note.anchor.type !== 'markdown-line' || note.anchor.line < start) continue
+      const next: SideNoteRecord = {
+        ...note,
+        anchor: { ...note.anchor, line: Math.max(1, note.anchor.line + delta) },
+        updatedAt: nowIso()
+      }
+      session.assertActive()
+      await updateNote(note.id, next, undefined, undefined, session)
+      session.assertActive()
     }
-    await updateNote(note.id, next)
+  } catch (error) {
+    if (session.isActive()) throw error
   }
 }

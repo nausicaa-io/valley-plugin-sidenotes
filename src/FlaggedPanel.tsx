@@ -1,6 +1,8 @@
 import { React, api } from './runtime'
+import { useVisibleRange } from './visibleRange'
 import type { ReactElement } from 'react'
-import { anchorLabel, anchorValidationMsg, validateAnchor, type AnchorStatus } from './anchors'
+import { anchorLabel, anchorValidationMsg, resolveAnchorProjection, type AnchorStatus } from './anchors'
+import { AnchorReadCancelled, AnchorReads } from './anchorReads'
 import { deleteNote, updateNote } from './data'
 import { NoteMenu, SideNoteEditModal, SideNotesFilterPopover, SideNotesSortPopover } from './fields'
 import { Filter, Flag, Globe, Rows3, Search, SortAscending, SortDescending, TriangleAlert, X } from './icons'
@@ -55,6 +57,7 @@ export const FlaggedPanel = (): ReactElement => {
   const [sortField, setSortField] = useSideNoteViewField<SortField>('left_sidebar', 'sortField', 'updated')
   const [sortDir, setSortDir] = useSideNoteViewField<SortDir>('left_sidebar', 'sortDir', 'desc')
   const [anchorStatus, setAnchorStatus] = React.useState<Map<string, AnchorStatus>>(new Map())
+  const [anchorError, setAnchorError] = React.useState<string | null>(null)
   const [filterWarning, setFilterWarning] = useSideNoteViewField<boolean>('left_sidebar', 'filterWarning', false)
   const [sourceType, setSourceType] = useSideNoteViewField<string>('left_sidebar', 'sourceType', ALL_SOURCE_TYPES)
   const [compact, setCompact] = useSideNoteViewField<boolean>('left_sidebar', 'compact', false)
@@ -128,26 +131,29 @@ export const FlaggedPanel = (): ReactElement => {
       const n = map.get(id)
       if (n) out.push(n)
     }
+    const existing = new Set(displayOrderRef.current)
     for (const n of source) {
-      if (!displayOrderRef.current.includes(n.id)) out.push(n)
+      if (!existing.has(n.id)) out.push(n)
     }
     displayOrderRef.current = out.map((n) => n.id)
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, orderNonce, filterWarning, anchorStatus])
 
+  const visibleIds = React.useMemo(() => display.map(note => note.id), [display])
+  const visibleNotes = useVisibleRange(React, { ids: visibleIds, estimate: compact ? 64 : 140, pinned: [editing?.id, menuId], layoutKey: compact })
+
   React.useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      const next = new Map<string, AnchorStatus>()
-      for (const note of visible) {
-        const status = await validateAnchor(note.url ?? note.path, note.anchor)
-        if (cancelled) return
-        if (status !== 'ok') next.set(note.id, status)
-      }
-      if (!cancelled) setAnchorStatus(next)
-    })()
-    return () => { cancelled = true }
+    const reads = new AnchorReads()
+    void resolveAnchorProjection(visible, reads).then(({ statuses }) => {
+      if (!reads.isActive()) return
+      setAnchorStatus(statuses)
+      setAnchorError(null)
+    }).catch(error => {
+      if (error instanceof AnchorReadCancelled || !reads.isActive()) return
+      setAnchorError(uiText('sideNotes.error.load'))
+    }).finally(() => reads.dispose())
+    return () => reads.dispose()
   }, [visible, anchorInfoNonce])
 
   const patch = async (id: string, changes: Partial<SideNoteRecord>): Promise<void> => {
@@ -255,18 +261,19 @@ export const FlaggedPanel = (): ReactElement => {
         )}
       </div>
       <div className="panel-body flagged-notes-panel-body hidescrollbar">
-        {error && <div role="alert">{error} <button type="button" onClick={reload}>{uiText('sideNotes.action.retry')}</button></div>}
+        {(error || anchorError) && <div role="alert">{error || anchorError} <button type="button" onClick={() => { reload(); setAnchorInfoNonce(n => n + 1) }}>{uiText('sideNotes.action.retry')}</button></div>}
         {loading ? (
           <div className="tree-empty">{uiText('auto.33ce417454bf')}</div>
         ) : display.length === 0 ? (
           <div className="tree-empty">{search || sourceType !== ALL_SOURCE_TYPES ? uiText('auto.b690846c83ff') : showAll ? uiText('auto.d2a1e72bc320') : uiText('auto.f5ca64c680ee')}</div>
         ) : (
-          <div className="flagged-notes-list">
-            {display.map((note) => {
+          <div className="flagged-notes-list" ref={visibleNotes.ref}>
+            {visibleNotes.render(index => {
+                const note = display[index]
               const status = anchorStatus.get(note.id)
               const invalid = status !== undefined
               return (
-                <div key={note.id}
+                <div key={note.id} data-visible-key={note.id} data-visible-index={index}
                   className={`flagged-note-card${note.flagged ? ' flagged' : ''}${invalid ? ' invalid' : ''}${compact ? ' compact' : ''}`}
                   onClick={() => { selectSideNote(note, 'left_sidebar'); openNote(note) }} title={note.url ?? note.path}>
                   <div className="flagged-note-header">

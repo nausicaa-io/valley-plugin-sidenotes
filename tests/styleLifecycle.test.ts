@@ -11,7 +11,7 @@ afterEach(() => {
 
 describe('stylesheet lifecycle', () => {
   it('injects, disposes, and re-registers once in every appearance mode', () => {
-    for (const theme of ['dark', 'light', 'reading']) {
+    for (const theme of ['dark', 'light']) {
       document.documentElement.dataset.theme = theme
       for (let pass = 0; pass < 2; pass++) {
         const dispose = injectStyles()

@@ -17,6 +17,7 @@ import { registerSearchCard } from '../src/searchCard'
 import config from '../config.json'
 import { SideNoteEditModal } from '../src/fields'
 import { loadNotes } from '../src/data'
+import { registerSideNotesFence } from '../src/fence'
 
 const now = '2026-06-01T12:00:00.000Z'
 const sideNotesRecords = (mock: MockValleyApi): DataRecord[] =>
@@ -112,6 +113,74 @@ describe('shared SideNote documents', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Cancel' })) })
     expect(close).toHaveBeenCalledTimes(1)
     expect(mock.api.documents.drafts.clear).toHaveBeenCalledWith({ pluginId: 'sideNotes', sourceId: 'notes', itemId: 'n1' })
+  })
+})
+
+describe('scoped SideNotes fences', () => {
+  afterEach(cleanup)
+
+  it('normalizes the web fence URL before both its query and final filter', async () => {
+    const mock = createMockValleyApi({
+      manifest: { id: 'sideNotes', noteDocuments: config.noteDocuments },
+      datasets: { 'sideNotes.notes': [webNote()] as DatasetRecord[], 'sideNotes.note_tags': [], 'sideNotes.path_history': [] }
+    })
+    initRuntime(mock.api)
+    mock.api.ui.renderReact = (element, node) => {
+      const mounted = render(node as React.ReactElement, { container: element })
+      return () => mounted.unmount()
+    }
+    const off = registerSideNotesFence()
+    const element = document.createElement('div')
+    document.body.appendChild(element)
+    const dispose = mock.codeBlockRenderers.get('sidenotes')!('url: https://EXAMPLE.COM:443/docs#section', element, { path: null, meta: null })
+    try { expect(await screen.findByText('page note here')).toBeInTheDocument() }
+    finally { if (typeof dispose === 'function') dispose(); off(); element.remove() }
+  })
+
+  it('keeps file-fence matching semantics while reading only that subject and allows retry after failure', async () => {
+    const mock = createMockValleyApi({
+      manifest: { id: 'sideNotes', noteDocuments: config.noteDocuments },
+      datasets: {
+        'sideNotes.notes': [fileNote('file', 'Notes/A.md', 'File annotation'), webNote({ id: 'mixed', path: 'Notes/A.md', note: 'Mixed subject annotation' }), fileNote('other', 'Notes/B.md', 'Unrelated annotation')] as DatasetRecord[],
+        'sideNotes.note_tags': [], 'sideNotes.path_history': []
+      }
+    })
+    initRuntime(mock.api)
+    const dataset = mock.api.data.dataset
+    const bodyIds: string[][] = []
+    let fail = true
+    mock.api.data.dataset = ((id: string) => {
+      const handle = dataset(id)
+      return { ...handle, query: async (query) => {
+        if (id === 'sideNotes.note_tags' && fail) { fail = false; throw new Error('Relations unavailable') }
+        if (id === 'sideNotes.notes' && !query?.select) {
+          const condition = query?.where?.id
+          if (!condition || typeof condition !== 'object' || !('in' in condition)) throw new Error('Unscoped fence body query')
+          bodyIds.push(condition.in as string[])
+        }
+        return handle.query(query)
+      } }
+    }) as typeof dataset
+    mock.api.ui.renderReact = (element, node) => {
+      const mounted = render(node as React.ReactElement, { container: element })
+      return () => mounted.unmount()
+    }
+    const off = registerSideNotesFence()
+    const element = document.createElement('div')
+    document.body.appendChild(element)
+    const dispose = mock.codeBlockRenderers.get('sidenotes')!('', element, { path: 'Notes/A.md', meta: null })
+    try {
+      expect(await screen.findByRole('alert')).toHaveTextContent('Could not load SideNotes')
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+      expect(await screen.findByText('File annotation')).toBeInTheDocument()
+      expect(screen.getByText('Mixed subject annotation')).toBeInTheDocument()
+      expect(screen.queryByText('Unrelated annotation')).not.toBeInTheDocument()
+      expect(bodyIds).toEqual([['file', 'mixed'], ['file', 'mixed']])
+    } finally {
+      if (typeof dispose === 'function') dispose()
+      off()
+      element.remove()
+    }
   })
 })
 
@@ -410,4 +479,34 @@ describe('SideNotes flagged browser — website notes', () => {
       'All', '.flac'
     ])
   })
+})
+
+it.each([Panel, FlaggedPanel])('bounds large SideNotes surfaces without losing filtered results', async (Surface) => {
+  expect(config.indexState).toBe('scoped')
+  const mock = createMockValleyApi({
+    manifest: { id: 'sideNotes', indexState: config.indexState as 'scoped', noteDocuments: config.noteDocuments, datasets: config.datasets as unknown as ValleyPluginManifest['datasets'] },
+    activePath: 'Notes/Ferns.md',
+    indexEntries: [{ relPath: 'Notes/Ferns.md', title: 'Ferns', kind: 'note', mtimeMs: 1 }],
+    datasets: { 'sideNotes.notes': Array.from({ length: 500 }, (_, index) => fileNote(`large-${index}`, 'Notes/Ferns.md', `Annotation ${String(index).padStart(3, '0')}`) as DatasetRecord) }
+  })
+  const state = mock.api.getState()
+  expect(state.indexEntries).toEqual([])
+  const scoped = new Proxy(state, { get: (target, key) => {
+    if (key === 'indexEntries') throw new Error('SideNotes must not read the whole vault index')
+    return Reflect.get(target, key)
+  } })
+  vi.spyOn(mock.api, 'getState').mockReturnValue(scoped)
+  const observe = vi.spyOn(mock.api.index, 'observe')
+  initRuntime(mock.api)
+  const view = render(<Surface />)
+  await waitFor(() => expect(view.container.querySelectorAll('[data-visible-key]').length).toBeGreaterThan(0))
+  expect(view.container.querySelectorAll('[data-visible-key]').length).toBeLessThan(40)
+  const search = view.container.querySelector<HTMLInputElement>('.search-field-input')!
+  fireEvent.change(search, { target: { value: 'Annotation 499' } })
+  await waitFor(() => expect(view.container.querySelectorAll('[data-visible-key]')).toHaveLength(1))
+  expect(view.container.querySelector('[data-visible-key]')).toHaveAttribute('data-visible-key', 'large-499')
+  fireEvent.click(view.container.querySelector('[data-visible-key]')!)
+  expect(mock.api.workspace.openFile).toHaveBeenCalledWith('Notes/Ferns.md', { type: 'none' })
+  expect(observe).not.toHaveBeenCalled()
+  view.unmount()
 })

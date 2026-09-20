@@ -265,8 +265,8 @@ const CSS = `
   background: var(--hover-bg);
 }
 
-.sidenote-card + .sidenote-card::before,
-.flagged-note-card + .flagged-note-card::before {
+.sidenote-card[data-visible-index]:not([data-visible-index="0"])::before,
+.flagged-note-card[data-visible-index]:not([data-visible-index="0"])::before {
   content: '';
   position: absolute;
   top: 0;

@@ -1,4 +1,5 @@
 import { React, api } from './runtime'
+import { useVisibleRange } from './visibleRange'
 import type { ReactElement } from 'react'
 import { classifyFilePath } from '@valley/plugin-sdk/fileTypes'
 import {
@@ -10,7 +11,7 @@ import {
   defaultAnchor,
   enrichTextAnchor,
   liveDefaultAnchor,
-  resolvePositionKeys,
+  resolveAnchorProjection,
   validateAnchor,
   type ActiveContext,
   type AnchorStatus
@@ -26,6 +27,7 @@ import { uiText } from './localization'
 import { WEB_NAVIGATOR_V1 } from '@valley/plugin-sdk'
 import { selectionDraftStore, sideNoteEditStore } from './runtime'
 import { selectSideNote, useSideNoteSubject, useSideNoteViewField } from './surfaces'
+import { AnchorReadCancelled, AnchorReads } from './anchorReads'
 
 /** Open a note's subject: a web note navigates the browser; a file note opens
  *  in the workspace at its anchor. A web note already on screen is a no-op. */
@@ -56,7 +58,9 @@ export const Panel = (): ReactElement => {
   const hasSubject = !!path || isWeb
   const subjectKey = isWeb ? `web:${subjectUrl}` : path
   useSideNoteSubject(path, subjectUrl)
-  const { notes, setNotes, loading, error, reload } = useNotes()
+  const { notes, setNotes, loading, error, reload } = useNotes(
+    isWeb ? { kind: 'web', url: subjectUrl } : path ? { kind: 'file', path } : { kind: 'none' }
+  )
   const { isPending, setPending, pending } = usePending()
 
   const [draft, setDraft] = React.useState('')
@@ -70,6 +74,7 @@ export const Panel = (): ReactElement => {
   const [sortField, setSortField] = useSideNoteViewField<SortField>('right_sidebar', 'sortField', 'position')
   const [sortDir, setSortDir] = useSideNoteViewField<SortDir>('right_sidebar', 'sortDir', 'asc')
   const [anchorStatus, setAnchorStatus] = React.useState<Map<string, AnchorStatus>>(new Map())
+  const [anchorErrors, setAnchorErrors] = React.useState<{ projection?: string; draft?: string }>({})
   const [draftAnchorStatus, setDraftAnchorStatus] = React.useState<AnchorStatus>('ok')
   const [creating, setCreating] = React.useState(false)
   const creatingRef = React.useRef(false)
@@ -175,13 +180,18 @@ export const Panel = (): ReactElement => {
       const n = map.get(id)
       if (n) out.push(n)
     }
+    const existing = new Set(displayOrderRef.current)
     for (const n of filtered) {
-      if (!displayOrderRef.current.includes(n.id)) out.push(n)
+      if (!existing.has(n.id)) out.push(n)
     }
     displayOrderRef.current = out.map((n) => n.id)
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, orderNonce])
+
+  const visibleIds = React.useMemo(() => display.map(note => note.id), [display])
+  const visibleNotes = useVisibleRange(React, { ids: visibleIds, estimate: 140, pinned: [editing?.id, menuId] })
+
 
   React.useEffect(() => {
     setAnchorDraft(isWeb ? { type: 'none' } : defaultAnchor(path))
@@ -195,40 +205,35 @@ export const Panel = (): ReactElement => {
   }, [subjectKey])
 
   React.useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      const next = new Map<string, AnchorStatus>()
-      for (const note of forSubject) {
-        const status = await validateAnchor(note.path, note.anchor)
-        if (cancelled) return
-        if (status !== 'ok') next.set(note.id, status)
-      }
-      if (!cancelled) setAnchorStatus(next)
-    })()
-    return () => { cancelled = true }
-  }, [forSubject, anchorInfoNonce])
-
-  // Resolve document-order keys for the Position sort. PDF intra-page order needs
-  // the page text (async), so it can't run inside the sync `scoped` memo — we
-  // precompute keys here, then bump `orderNonce` so the stable display order
-  // re-snaps to the refined ordering. Only runs while sorting by position.
-  React.useEffect(() => {
-    if (sortField !== 'position') return
-    let cancelled = false
-    void (async () => {
-      const keys = await resolvePositionKeys(path, forSubject)
-      if (cancelled) return
-      setPosKeys(keys)
-      setOrderNonce((n) => n + 1)
-    })()
-    return () => { cancelled = true }
+    const reads = new AnchorReads()
+    const positions = sortField === 'position'
+    void resolveAnchorProjection(forSubject, reads, { path, positions }).then(({ statuses, keys }) => {
+      if (!reads.isActive()) return
+      setAnchorStatus(statuses)
+      setAnchorErrors(previous => ({ ...previous, projection: undefined }))
+      if (positions) { setPosKeys(keys); setOrderNonce(n => n + 1) }
+    }).catch(error => {
+      if (error instanceof AnchorReadCancelled || !reads.isActive()) return
+      setAnchorErrors(previous => ({ ...previous, projection: uiText('sideNotes.error.load') }))
+    }).finally(() => reads.dispose())
+    return () => reads.dispose()
   }, [forSubject, path, sortField, anchorInfoNonce])
 
   React.useEffect(() => {
-    if (!showCreate || !path) return
-    let cancelled = false
-    void validateAnchor(path, anchorDraft).then((status) => { if (!cancelled) setDraftAnchorStatus(status) })
-    return () => { cancelled = true }
+    if (!showCreate || !path) {
+      setAnchorErrors(previous => ({ ...previous, draft: undefined }))
+      return
+    }
+    const reads = new AnchorReads()
+    void validateAnchor(path, anchorDraft, reads).then(status => {
+      if (!reads.isActive()) return
+      setDraftAnchorStatus(status)
+      setAnchorErrors(previous => ({ ...previous, draft: undefined }))
+    }).catch(error => {
+      if (error instanceof AnchorReadCancelled || !reads.isActive()) return
+      setAnchorErrors(previous => ({ ...previous, draft: uiText('sideNotes.error.load') }))
+    }).finally(() => reads.dispose())
+    return () => reads.dispose()
   }, [anchorDraft, showCreate, path, anchorInfoNonce])
 
   const create = async (): Promise<void> => {
@@ -429,17 +434,18 @@ export const Panel = (): ReactElement => {
               </div>
             </div>
           )}
-          <div className="sidenote-list">
-            {error && <div role="alert">{error} <button type="button" onClick={reload}>{uiText('sideNotes.action.retry')}</button></div>}
+          <div className="sidenote-list" ref={visibleNotes.ref}>
+            {(error || anchorErrors.projection || anchorErrors.draft) && <div role="alert">{error || anchorErrors.projection || anchorErrors.draft} <button type="button" onClick={() => { reload(); setAnchorInfoNonce(n => n + 1) }}>{uiText('sideNotes.action.retry')}</button></div>}
             {loading ? (
               <div className="right-sidebar-empty"><p>{uiText('auto.33ce417454bf')}</p></div>
             ) : display.length ? (
-              display.map((note) => {
+              visibleNotes.render(index => {
+                const note = display[index]
                 const status = anchorStatus.get(note.id)
                 const invalid = status !== undefined
                 const busy = pending.has(note.id)
                 return (
-                  <article key={note.id}
+                  <article key={note.id} data-visible-key={note.id} data-visible-index={index}
                     className={`sidenote-card${note.flagged ? ' flagged' : ''}${invalid ? ' invalid' : ''}`}
                     onClick={() => { selectSideNote(note, 'right_sidebar'); openNote(note, subjectUrl) }}>
                     <div className="sidenote-card-meta" onClick={(e) => e.stopPropagation()}>

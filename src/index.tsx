@@ -16,7 +16,7 @@ import type {
 import { TEXT_SELECTION_ACTION_V1 } from '@valley/plugin-sdk'
 import { classifyFilePath } from '@valley/plugin-sdk/fileTypes'
 import { initRuntime, selectionDraftStore } from './runtime'
-import { retargetNotes, shiftLines } from './data'
+import { captureNoteMutation, noteRepository, retargetNotes, shiftLines } from './data'
 import { registerSideNotesFence } from './fence'
 import { registerSearchCard } from './searchCard'
 import { buildSelectionPrefill, extractFromSelection } from './highlights'
@@ -31,27 +31,36 @@ import { registerSideNoteSurfaces } from './surfaces'
 export function register(api: ValleyPluginApi): () => void {
   initLocalization(api)
   initRuntime(api)
+  const notes = noteRepository()
+  let disposed = false
+  const mutation = captureNoteMutation(api, () => {
+    if (disposed) throw new Error('SideNotes registration is no longer active')
+  })
   const disposeStyles = injectStyles()
   const offCommands = registerSideNoteCommands(api)
   const offSurfaces = registerSideNoteSurfaces(api)
 
   // Retarget anchors when a file is renamed or moved, and shift line anchors on edits.
   const offRenamed = api.files.onRenamed(({ oldPath, newPath }) => {
-    void retargetNotes(oldPath, newPath)
+    if (!mutation.isActive()) return
+    void retargetNotes(oldPath, newPath, mutation).catch((error) => console.error('SideNotes could not retarget notes', error))
   })
   const offLineShift = api.files.onLineShift(({ path, fromLine, delta }) => {
-    void shiftLines(path, fromLine, delta)
+    if (!mutation.isActive()) return
+    void shiftLines(path, fromLine, delta, mutation).catch((error) => console.error('SideNotes could not shift anchors', error))
   })
 
   const drafts = selectionDraftStore()
   const capture = async (detail: TextSelectionDetail | null): Promise<void> => {
-    if (!detail) return
+    if (!detail || !mutation.isActive()) return
+    detail = { ...detail }
     if (detail.surface === 'web') {
       if (!detail.url || !detail.text.trim()) return
       drafts.publish({ kind: 'web', url: detail.url, snippet: detail.text.trim().slice(0, 200) })
     } else {
       if (!detail.path || !detail.page) return
       const pageText = await api.workspace.getPdfPageText(detail.path, detail.page).catch(() => null)
+      if (!mutation.isActive()) return
       const prefill = buildSelectionPrefill({ path: detail.path, page: detail.page, text: detail.text }, pageText)
       if (!prefill) return
       drafts.publish(prefill)
@@ -72,6 +81,7 @@ export function register(api: ValleyPluginApi): () => void {
     hotkey: 'Mod-Shift-h',
     sideEffect: 'read',
     run: () => {
+      if (!mutation.isActive()) return undefined
       const path = api.getState().activePath
       const detail = path && classifyFilePath(path) === 'pdf' ? extractFromSelection(path, api.workspace.getTextSelection()) : null
       if (detail) void capture({ surface: 'pdf', ...detail })
@@ -88,6 +98,8 @@ export function register(api: ValleyPluginApi): () => void {
   const offSearchCard = registerSearchCard(api)
 
   return () => {
+    disposed = true
+    notes.dispose()
     offRenamed()
     offCommands()
     offSurfaces()

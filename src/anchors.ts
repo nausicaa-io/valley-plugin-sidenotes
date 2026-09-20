@@ -1,6 +1,7 @@
 import { uiText } from './localization'
 import { classifyFilePath } from '@valley/plugin-sdk/fileTypes'
 import { api } from './runtime'
+import { AnchorReads } from './anchorReads'
 import type { AnchorType, SideNoteAnchor, SideNoteRecord } from './types'
 
 export type AnchorStatus = 'ok' | 'missing' | 'ambiguous'
@@ -165,36 +166,34 @@ export function positionKey(anchor: SideNoteAnchor, haystack: string | null): nu
  */
 export async function resolvePositionKeys(
   path: string,
-  notes: SideNoteRecord[]
+  notes: SideNoteRecord[],
+  reader?: AnchorReads
 ): Promise<Map<string, number>> {
-  const keys = new Map<string, number>()
-  const needsFile = notes.some(
-    (n) =>
-      (n.anchor.type === 'markdown-snippet' || n.anchor.type === 'markdown-line') &&
-      !!(n.anchor as { snippet?: string }).snippet
-  )
-  const fileText = needsFile && path ? (await api.vault.readFile(path)) ?? '' : null
-
-  const pageCache = new Map<number, string | null>()
-  for (const note of notes) {
-    const anchor = note.anchor
-    if (anchor.type === 'pdf-page' && anchor.snippet) {
-      let pageText = pageCache.get(anchor.page)
-      if (pageText === undefined) {
-        pageText = path ? await api.workspace.getPdfPageText(path, anchor.page) : null
-        pageCache.set(anchor.page, pageText)
+  const reads = reader ?? new AnchorReads()
+  try {
+    const resolved = new Map<SideNoteRecord, number>()
+    const pages = new Map<number, SideNoteRecord[]>()
+    const needsFile = notes.some(n => (n.anchor.type === 'markdown-snippet' || n.anchor.type === 'markdown-line') && !!n.anchor.snippet)
+    const fileText = needsFile && path ? (await reads.file(path)) ?? '' : null
+    reads.assertActive()
+    for (const note of notes) {
+      const anchor = note.anchor
+      if (anchor.type === 'pdf-page' && anchor.snippet) {
+        const group = pages.get(anchor.page) ?? []
+        group.push(note)
+        pages.set(anchor.page, group)
+      } else {
+        resolved.set(note, positionKey(anchor, fileText))
       }
-      keys.set(note.id, positionKey(anchor, pageText))
-    } else if (
-      (anchor.type === 'markdown-snippet' || anchor.type === 'markdown-line') &&
-      anchor.snippet
-    ) {
-      keys.set(note.id, positionKey(anchor, fileText))
-    } else {
-      keys.set(note.id, positionKey(anchor, null))
     }
-  }
-  return keys
+    for (const [page, group] of pages) {
+      reads.assertActive()
+      const text = path ? await reads.page(path, page) : null
+      reads.assertActive()
+      for (const note of group) resolved.set(note, positionKey(note.anchor, text))
+    }
+    return new Map(notes.map(note => [note.id, resolved.get(note)!]))
+  } finally { if (!reader) reads.dispose() }
 }
 
 /**
@@ -262,14 +261,16 @@ export function parseTime(text: string): number | null {
 }
 
 /** Resolve a text anchor's snippet/line against the current file contents. */
-export async function enrichTextAnchor(path: string, anchor: SideNoteAnchor): Promise<SideNoteAnchor> {
+export async function enrichTextAnchor(path: string, anchor: SideNoteAnchor, reader?: AnchorReads): Promise<SideNoteAnchor> {
+  reader?.assertActive()
   if (
     anchor.type !== 'markdown-line' &&
     anchor.type !== 'markdown-heading' &&
     anchor.type !== 'markdown-snippet'
   )
     return anchor
-  const text = await api.vault.readFile(path)
+  const text = reader ? await reader.file(path) : await api.vault.readFile(path)
+  reader?.assertActive()
   if (!text) return anchor
   const lines = text.replace(/\r\n?/g, '\n').split('\n')
   if (anchor.type === 'markdown-line') {
@@ -286,44 +287,100 @@ export async function enrichTextAnchor(path: string, anchor: SideNoteAnchor): Pr
   return index >= 0 ? { ...anchor, line: index + 1 } : anchor
 }
 
-export async function validateAnchor(path: string, anchor: SideNoteAnchor): Promise<AnchorStatus> {
-  if (anchor.type === 'pdf-page') {
-    const numPages = api.workspace.getPdfPageCount(path)
-    if (typeof numPages === 'number' && anchor.page > numPages) return 'missing'
-    if (anchor.snippet) {
-      const pageText = await api.workspace.getPdfPageText(path, anchor.page)
-      // Whitespace-normalized: a highlight snippet is collapsed to single spaces,
-      // while the page text may carry layout whitespace between items.
-      if (pageText !== null && !normalizeWhitespace(pageText).includes(normalizeWhitespace(anchor.snippet)))
-        return 'missing'
+export async function validateAnchor(path: string, anchor: SideNoteAnchor, reader?: AnchorReads): Promise<AnchorStatus> {
+  reader?.assertActive()
+  if (!['pdf-page', 'media-time', 'markdown-line', 'markdown-heading', 'markdown-snippet'].includes(anchor.type)) return 'ok'
+  const reads = reader ?? new AnchorReads()
+  try {
+    reads.assertActive()
+    if (anchor.type === 'pdf-page') {
+      const numPages = reads.pageCount(path)
+      if (typeof numPages === 'number' && anchor.page > numPages) return 'missing'
+      const text = anchor.snippet ? await reads.page(path, anchor.page) : null
+      reads.assertActive()
+      return pdfStatus(anchor, numPages, text)
     }
-    return 'ok'
-  }
-  if (anchor.type === 'media-time') {
-    const duration = api.workspace.getMediaDuration()
-    if (typeof duration === 'number' && anchor.seconds > duration) return 'missing'
-    return 'ok'
-  }
-  if (
-    anchor.type !== 'markdown-line' &&
-    anchor.type !== 'markdown-heading' &&
-    anchor.type !== 'markdown-snippet'
-  )
-    return 'ok'
-  const text = await api.vault.readFile(path)
+    if (anchor.type === 'media-time') {
+      const duration = reads.mediaDuration()
+      return typeof duration === 'number' && anchor.seconds > duration ? 'missing' : 'ok'
+    }
+    const text = await reads.file(path)
+    reads.assertActive()
+    return textStatus(anchor, text)
+  } finally { if (!reader) reads.dispose() }
+}
+
+function pdfStatus(anchor: Extract<SideNoteAnchor, { type: 'pdf-page' }>, count: number | null, text: string | null): AnchorStatus {
+  if (typeof count === 'number' && anchor.page > count) return 'missing'
+  if (anchor.snippet && text !== null && !normalizeWhitespace(text).includes(normalizeWhitespace(anchor.snippet))) return 'missing'
+  return 'ok'
+}
+
+function textStatus(anchor: SideNoteAnchor, text: string | null, lines = text?.replace(/\r\n?/g, '\n').split('\n') ?? []): AnchorStatus {
   if (!text) return 'ok'
-  const lines = text.replace(/\r\n?/g, '\n').split('\n')
   if (anchor.type === 'markdown-line') return anchor.line <= lines.length ? 'ok' : 'missing'
   if (anchor.type === 'markdown-heading') {
     const wanted = anchor.heading.trim().toLowerCase()
-    return lines.some((l) => l.replace(/^#+\s*/, '').trim().toLowerCase() === wanted) ? 'ok' : 'missing'
+    return lines.some(l => l.replace(/^#+\s*/, '').trim().toLowerCase() === wanted) ? 'ok' : 'missing'
   }
+  if (anchor.type !== 'markdown-snippet') return 'ok'
   const wanted = anchor.snippet.trim()
   if (!wanted) return 'ok'
-  const matches = lines.filter((l) => l.includes(wanted)).length
-  if (matches === 0) return 'missing'
-  if (matches > 1) return 'ambiguous'
-  return 'ok'
+  const matches = lines.filter(l => l.includes(wanted)).length
+  return matches === 0 ? 'missing' : matches > 1 ? 'ambiguous' : 'ok'
+}
+
+export async function resolveAnchorProjection(
+  notes: SideNoteRecord[],
+  reads: AnchorReads,
+  options: { path?: string; positions?: boolean } = {}
+): Promise<{ statuses: Map<string, AnchorStatus>; keys: Map<string, number> }> {
+  const groups = new Map<string, { path: string; page?: number; notes: SideNoteRecord[] }>()
+  const statuses = new Map<SideNoteRecord, AnchorStatus>()
+  const keys = new Map<SideNoteRecord, number>()
+  for (const note of notes) {
+    reads.assertActive()
+    const path = options.path ?? note.url ?? note.path
+    const anchor = note.anchor
+    if (anchor.type === 'pdf-page' || anchor.type === 'markdown-line' || anchor.type === 'markdown-heading' || anchor.type === 'markdown-snippet') {
+      const page = anchor.type === 'pdf-page' ? anchor.page : undefined
+      const key = JSON.stringify([path, page ?? 'file'])
+      const group = groups.get(key) ?? { path, page, notes: [] }
+      group.notes.push(note)
+      groups.set(key, group)
+    } else {
+      const duration = anchor.type === 'media-time' ? reads.mediaDuration() : null
+      statuses.set(note, anchor.type === 'media-time' && typeof duration === 'number' && anchor.seconds > duration ? 'missing' : 'ok')
+      if (options.positions) keys.set(note, positionKey(anchor, null))
+    }
+  }
+  for (const group of groups.values()) {
+    reads.assertActive()
+    if (group.page !== undefined) {
+      const count = reads.pageCount(group.path)
+      const needsText = group.notes.some(note => note.anchor.type === 'pdf-page' && !!note.anchor.snippet)
+        && (options.positions || typeof count !== 'number' || group.page <= count)
+      const text = needsText ? await reads.page(group.path, group.page) : null
+      reads.assertActive()
+      for (const note of group.notes) {
+        statuses.set(note, pdfStatus(note.anchor as Extract<SideNoteAnchor, { type: 'pdf-page' }>, count, text))
+        if (options.positions) keys.set(note, positionKey(note.anchor, text))
+      }
+    } else {
+      const text = await reads.file(group.path)
+      reads.assertActive()
+      const lines = text?.replace(/\r\n?/g, '\n').split('\n') ?? []
+      for (const note of group.notes) {
+        statuses.set(note, textStatus(note.anchor, text, lines))
+        if (options.positions) keys.set(note, positionKey(note.anchor, text))
+      }
+    }
+  }
+  reads.assertActive()
+  return {
+    statuses: new Map(notes.filter(note => statuses.get(note) !== 'ok').map(note => [note.id, statuses.get(note)!])),
+    keys: options.positions ? new Map(notes.map(note => [note.id, keys.get(note)!])) : new Map()
+  }
 }
 
 export function anchorValidationMsg(anchor: SideNoteAnchor, status: AnchorStatus): string {

@@ -16,9 +16,10 @@ import codeBlockExamples from './codeBlockExamples.json'
 import { React, api } from './runtime'
 import type { FC } from 'react'
 import { fenceInt, parseFenceParams } from '@valley/plugin-sdk/fenceParams'
-import { loadNotes, onChanged } from './data'
+import { useNotes } from './hooks'
 import type { SideNoteRecord } from './types'
 import { uiText } from './localization'
+import { normalizeUrl } from './web'
 
 const STYLE_ID = 'notes-sidenotes-fence-styles'
 
@@ -52,30 +53,17 @@ const anchorLabel = (note: SideNoteRecord): string => {
 }
 
 const SideNotesFence: FC<{ code: string; path: string | null }> = ({ code, path }) => {
-  const [notes, setNotes] = React.useState<SideNoteRecord[] | null>(null)
-  React.useEffect(() => {
-    let alive = true
-    const reload = (): void => {
-      void loadNotes().then((records) => {
-        if (alive) setNotes(records)
-      })
-    }
-    reload()
-    const off = onChanged(reload)
-    return () => {
-      alive = false
-      off()
-    }
-  }, [])
-
   const params = parseFenceParams(code)
   const file = params.values.file ?? params.bare ?? path
-  const url = params.values.url ?? null
+  const url = params.values.url ? normalizeUrl(params.values.url) : null
   const flaggedOnly = (params.values.flagged ?? '').toLowerCase() === 'true'
   const tag = params.values.tag ? params.values.tag.replace(/^#/, '').toLowerCase() : null
   const limit = fenceInt(params, 'limit', 100) ?? 20
+  const { notes, loading, error, reload } = useNotes(url ? { kind: 'web', url } : file
+    ? { kind: 'file', path: file, includeWeb: true } : flaggedOnly ? undefined : { kind: 'none' })
 
-  if (!notes) return <div className="sidenotes-fence-empty">{uiText('auto.33ce417454bf')}</div>
+  if (error) return <div className="sidenotes-fence-empty" role="alert">{error} <button type="button" onClick={reload}>{uiText('sideNotes.action.retry')}</button></div>
+  if (loading) return <div className="sidenotes-fence-empty">{uiText('auto.33ce417454bf')}</div>
   const shown = notes
     .filter((note) => {
       if (url) return note.url === url

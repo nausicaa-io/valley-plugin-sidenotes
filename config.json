@@ -1,6 +1,7 @@
 {
   "icon": "sticky-note",
   "main": "runtime/index.js",
+  "indexState": "scoped",
   "noteDocuments": [
     {
       "id": "notes",
