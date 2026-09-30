@@ -1,0 +1,19 @@
+{
+  "datasets": {
+    "notes": [
+      {
+        "id": "sidenote-fixture",
+        "path": "Notes/Frontmatter.md",
+        "note": "Orange cap on the forest floor",
+        "anchor": {
+          "type": "markdown-line",
+          "line": 12,
+          "snippet": "Record chanterelle habitat"
+        },
+        "createdAt": "2026-08-13T12:00:00.000Z",
+        "updatedAt": "2026-08-13T12:00:00.000Z",
+        "flagged": false
+      }
+    ]
+  }
+}

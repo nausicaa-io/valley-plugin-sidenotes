@@ -1,0 +1,17 @@
+{
+  "apiVersion": 5,
+  "id": "sideNotes",
+  "name": "SideNotes",
+  "version": "2.1.0",
+  "description": "Margin notes anchored to a file, a heading, a line, a PDF selection or a web page — with flags, tags and a cross-vault browser.",
+  "author": [
+    "valley"
+  ],
+  "authorUrl": [
+    "https://github.com/valley-app"
+  ],
+  "license": "MIT",
+  "minAppVersion": "0.1.0",
+  "isDesktopOnly": true,
+  "enabled": true
+}

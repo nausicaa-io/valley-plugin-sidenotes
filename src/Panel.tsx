@@ -1,0 +1,511 @@
+import { React, api } from './runtime'
+import { useVisibleRange } from './visibleRange'
+import type { ReactElement } from 'react'
+import { classifyFilePath } from '@valley/plugin-sdk/fileTypes'
+import {
+  anchorInContext,
+  anchorLabel,
+  anchorOrder,
+  anchorValidationMsg,
+  comparePosition,
+  defaultAnchor,
+  enrichTextAnchor,
+  liveDefaultAnchor,
+  resolveAnchorProjection,
+  validateAnchor,
+  type ActiveContext,
+  type AnchorStatus
+} from './anchors'
+import { appendNote, deleteNote, makeNote, makeWebNote, updateNote } from './data'
+import { AnchorEditor, NoteMenu, SideNoteEditModal, SideNotesSortPopover } from './fields'
+import { Crosshair, Flag, Globe, Plus, Search, SortAscending, SortDescending, StickyNote, TriangleAlert, X } from './icons'
+import { useActivePath, useActiveWebContext, useNotes, usePending } from './hooks'
+import { normalizeUrl, webHostLabel } from './web'
+import { matchesSearch } from './search'
+import type { SideNoteAnchor, SideNoteRecord } from './types'
+import { uiText } from './localization'
+import { selectionDraftStore, sideNoteEditStore } from './runtime'
+import { selectSideNote, useSideNoteSubject, useSideNoteViewField } from './surfaces'
+import { AnchorReadCancelled, AnchorReads } from './anchorReads'
+
+/** Open a note's subject: a web note navigates the browser; a file note opens
+ *  in the workspace at its anchor. A web note already on screen is a no-op. */
+function openNote(note: SideNoteRecord, activeUrl: string): void {
+  if (note.url) {
+    if (note.url !== activeUrl) {
+      void api.links.open(note.url)
+    }
+    return
+  }
+  api.workspace.openFile(note.path, note.anchor.type === 'web-selection' ? undefined : note.anchor)
+}
+
+type SortField = 'position' | 'created' | 'updated'
+type SortDir = 'asc' | 'desc'
+const SORT_LABELS: Record<SortField, string> = { position: 'Position', created: 'Created', updated: 'Updated' }
+const DEFAULT_DIR: Record<SortField, SortDir> = { position: 'asc', created: 'desc', updated: 'desc' }
+
+/** Per-file SideNotes — the plugin's `right_sidebar` view. */
+export const Panel = (): ReactElement => {
+  const filePath = useActivePath() ?? ''
+  const web = useActiveWebContext()
+  // A web tab has no vault file, so `filePath` is empty while a site is focused.
+  // Subject = the file (when one is open) else the active website else nothing.
+  const isWeb = !filePath && !!web?.url
+  const subjectUrl = isWeb && web ? normalizeUrl(web.url) : ''
+  const path = isWeb ? '' : filePath
+  const fileKind = React.useMemo(() => classifyFilePath(path), [path])
+  const positional =
+    fileKind === 'pdf' || fileKind === 'video' || fileKind === 'audio' || fileKind === 'text'
+  const hasSubject = !!path || isWeb
+  const subjectKey = isWeb ? `web:${subjectUrl}` : path
+  useSideNoteSubject(path, subjectUrl)
+  const { notes, setNotes, loading, error, reload } = useNotes(
+    isWeb ? { kind: 'web', url: subjectUrl } : path ? { kind: 'file', path } : { kind: 'none' }
+  )
+  const { isPending, setPending, pending } = usePending()
+
+  const [draft, setDraft] = React.useState('')
+  const [draftTags, setDraftTags] = React.useState<string[]>([])
+  const [anchorDraft, setAnchorDraft] = React.useState<SideNoteAnchor>(() => defaultAnchor(path))
+  const [showCreate, setShowCreate] = React.useState(false)
+  const [menuId, setMenuId] = React.useState<string | null>(null)
+  const [editing, setEditing] = React.useState<SideNoteRecord | null>(null)
+  const [search, setSearch] = useSideNoteViewField<string>('right_sidebar', 'search', '')
+  const [filterWarning, setFilterWarning] = useSideNoteViewField<boolean>('right_sidebar', 'filterWarning', false)
+  const [savedSortField, setSortField] = useSideNoteViewField<SortField>('right_sidebar', 'sortField', positional ? 'position' : 'updated')
+  const [savedSortDir, setSortDir] = useSideNoteViewField<SortDir>('right_sidebar', 'sortDir', positional ? 'asc' : 'desc')
+  const sortField = !positional && savedSortField === 'position' ? 'updated' : savedSortField
+  const sortDir = !positional && savedSortField === 'position' ? 'desc' : savedSortDir
+  const [anchorStatus, setAnchorStatus] = React.useState<Map<string, AnchorStatus>>(new Map())
+  const [anchorErrors, setAnchorErrors] = React.useState<{ projection?: string; draft?: string }>({})
+  const [draftAnchorStatus, setDraftAnchorStatus] = React.useState<AnchorStatus>('ok')
+  const [creating, setCreating] = React.useState(false)
+  const creatingRef = React.useRef(false)
+  const [anchorInfoNonce, setAnchorInfoNonce] = React.useState(0)
+  const [posKeys, setPosKeys] = React.useState<Map<string, number>>(new Map())
+  const [aware, setAware] = useSideNoteViewField<boolean>('right_sidebar', 'aware', false)
+  const [ctx, setCtx] = React.useState<ActiveContext>({})
+  const [settingsNonce, setSettingsNonce] = React.useState(0)
+  const [pendingCreateNonce, setPendingCreateNonce] = React.useState(0)
+  const selectionDrafts = selectionDraftStore()
+
+  React.useEffect(() => api.files.onAnchorInfoChanged(() => setAnchorInfoNonce((n) => n + 1)), [])
+
+  React.useEffect(() => {
+    return selectionDrafts.subscribe(() => setPendingCreateNonce((nonce) => nonce + 1))
+  }, [selectionDrafts])
+
+  // ± window (seconds) for media notes in Aware mode, from this plugin's settings.
+  const mediaRange = React.useMemo(() => {
+    const v = Number(api.settings.get().mediaRangeSeconds)
+    return Number.isFinite(v) && v >= 0 ? v : 10
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsNonce])
+  React.useEffect(() => {
+    return api.settings.subscribe(() => setSettingsNonce((nonce) => nonce + 1))
+  }, [])
+
+  // Read the live viewer position (visible PDF page(s) / playback time / line range).
+  const readActiveContext = React.useCallback(
+    (): ActiveContext => ({
+      pdfPages: path ? api.workspace.getPdfVisiblePages(path) : null,
+      mediaSeconds: api.workspace.getMediaTime(),
+      lineRange: path ? api.workspace.getVisibleLineRange(path) : null
+    }),
+    [path]
+  )
+
+  // While Aware is on, keep `ctx` synced to the active viewer. PDF page + markdown
+  // scroll fire `onActivePositionChanged`; media time has no event, so poll it.
+  React.useEffect(() => {
+    if (!aware || !path || !positional) {
+      setCtx({})
+      return
+    }
+    const read = (): void => setCtx(readActiveContext())
+    read()
+    const off = api.files.onActivePositionChanged(read)
+    const isMedia = fileKind === 'video' || fileKind === 'audio'
+    const timer = isMedia ? window.setInterval(read, 1000) : undefined
+    return () => {
+      off()
+      if (timer) window.clearInterval(timer)
+    }
+  }, [aware, path, fileKind, positional, readActiveContext])
+
+  const forSubject = React.useMemo(
+    () => (isWeb ? notes.filter((n) => n.url === subjectUrl) : path ? notes.filter((n) => n.path === path && !n.url) : []),
+    [notes, path, subjectUrl, isWeb]
+  )
+
+  const scoped = React.useMemo(() => {
+    if (sortField === 'position') {
+      const ordered = [...forSubject].sort((a, b) => comparePosition(a, b, posKeys))
+      return sortDir === 'desc' ? ordered.reverse() : ordered
+    }
+    const key = sortField === 'created' ? 'createdAt' : 'updatedAt'
+    return [...forSubject].sort((a, b) => {
+      const r = a[key].localeCompare(b[key]) || anchorOrder(a.anchor) - anchorOrder(b.anchor)
+      return sortDir === 'asc' ? r : -r
+    })
+  }, [forSubject, sortField, sortDir, posKeys])
+
+  const filtered = React.useMemo(() => {
+    let result = search.trim()
+      ? scoped.filter((n) => matchesSearch(search, n.tags ?? [], n.note))
+      : scoped
+    if (aware && positional) result = result.filter((n) => anchorInContext(n.anchor, ctx, mediaRange))
+    if (filterWarning) result = result.filter((n) => anchorStatus.has(n.id))
+    return result
+  }, [scoped, search, filterWarning, anchorStatus, aware, positional, ctx, mediaRange])
+
+  // Stable display order: re-sort only when a sort/filter control changes (below),
+  // never on an in-place edit. Toggling a task checkbox bumps `updatedAt` but the
+  // card must stay put while sorting by Updated.
+  const displayOrderRef = React.useRef<string[]>([])
+  const [orderNonce, setOrderNonce] = React.useState(0)
+
+  React.useEffect(() => {
+    displayOrderRef.current = filtered.map((n) => n.id)
+    setOrderNonce((n) => n + 1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, sortField, sortDir, search, filterWarning, aware, ctx])
+
+  const display = React.useMemo(() => {
+    const map = new Map(filtered.map((n) => [n.id, n]))
+    const out: SideNoteRecord[] = []
+    for (const id of displayOrderRef.current) {
+      const n = map.get(id)
+      if (n) out.push(n)
+    }
+    const existing = new Set(displayOrderRef.current)
+    for (const n of filtered) {
+      if (!existing.has(n.id)) out.push(n)
+    }
+    displayOrderRef.current = out.map((n) => n.id)
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, orderNonce])
+
+  const visibleIds = React.useMemo(() => display.map(note => note.id), [display])
+  const visibleNotes = useVisibleRange(React, { ids: visibleIds, estimate: 140, pinned: [editing?.id, menuId] })
+
+
+  React.useEffect(() => {
+    setAnchorDraft(isWeb ? { type: 'none' } : defaultAnchor(path))
+    setDraft('')
+    setDraftTags([])
+    setShowCreate(false)
+    setSortField(positional ? 'position' : 'updated')
+    setSortDir(positional ? 'asc' : 'desc')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjectKey])
+
+  React.useEffect(() => {
+    const reads = new AnchorReads()
+    const positions = sortField === 'position'
+    void resolveAnchorProjection(forSubject, reads, { path, positions }).then(({ statuses, keys }) => {
+      if (!reads.isActive()) return
+      setAnchorStatus(statuses)
+      setAnchorErrors(previous => ({ ...previous, projection: undefined }))
+      if (positions) { setPosKeys(keys); setOrderNonce(n => n + 1) }
+    }).catch(error => {
+      if (error instanceof AnchorReadCancelled || !reads.isActive()) return
+      setAnchorErrors(previous => ({ ...previous, projection: uiText('sideNotes.error.load') }))
+    }).finally(() => reads.dispose())
+    return () => reads.dispose()
+  }, [forSubject, path, sortField, anchorInfoNonce])
+
+  React.useEffect(() => {
+    if (!showCreate || !path) {
+      setAnchorErrors(previous => ({ ...previous, draft: undefined }))
+      return
+    }
+    const reads = new AnchorReads()
+    void validateAnchor(path, anchorDraft, reads).then(status => {
+      if (!reads.isActive()) return
+      setDraftAnchorStatus(status)
+      setAnchorErrors(previous => ({ ...previous, draft: undefined }))
+    }).catch(error => {
+      if (error instanceof AnchorReadCancelled || !reads.isActive()) return
+      setAnchorErrors(previous => ({ ...previous, draft: uiText('sideNotes.error.load') }))
+    }).finally(() => reads.dispose())
+    return () => reads.dispose()
+  }, [anchorDraft, showCreate, path, anchorInfoNonce])
+
+  const create = async (): Promise<void> => {
+    if (creatingRef.current) return
+    const text = draft.trim()
+    if (!text || !hasSubject) return
+    creatingRef.current = true
+    setCreating(true)
+    try {
+      // Web anchors carry only a (manually entered) selection snippet — nothing to
+      // resolve against a file. File anchors are enriched against the file text.
+      const record = isWeb
+        ? makeWebNote(subjectUrl, text, anchorDraft, draftTags)
+        : makeNote(path, text, await enrichTextAnchor(path, anchorDraft), draftTags)
+      setNotes((prev) => [...prev, record])
+      setDraft('')
+      setDraftTags([])
+      setShowCreate(false)
+      const ok = await appendNote(record)
+      if (!ok) {
+        setNotes((prev) => prev.filter((n) => n.id !== record.id))
+        setDraft(text)
+        setShowCreate(true)
+      }
+    } finally {
+      creatingRef.current = false
+      setCreating(false)
+    }
+  }
+
+  const patch = async (id: string, changes: Partial<SideNoteRecord>): Promise<boolean> => {
+    if (isPending(id)) return false
+    const current = notes.find((n) => n.id === id)
+    if (!current) return false
+    const next = { ...current, ...changes, updatedAt: new Date().toISOString() }
+    setPending(id, true)
+    setNotes((prev) => prev.map((n) => (n.id === id ? next : n)))
+    try {
+      const ok = await updateNote(id, next, current.updatedAt)
+      if (!ok) setNotes((prev) => prev.map((n) => (n.id === id ? current : n)))
+      return ok
+    } finally {
+      setPending(id, false)
+    }
+  }
+
+  const remove = async (id: string): Promise<void> => {
+    if (isPending(id)) return
+    const current = notes.find((n) => n.id === id)
+    if (!current) return
+    setPending(id, true)
+    setNotes((prev) => prev.filter((n) => n.id !== id))
+    try {
+      const ok = await deleteNote(id)
+      if (!ok) setNotes((prev) => (prev.some((n) => n.id === id) ? prev : [...prev, current]))
+    } finally {
+      setPending(id, false)
+    }
+  }
+  const confirmRemove = async (id: string): Promise<void> => {
+    const choice = await api.ui.confirm({
+      title: uiText('auto.042dc9b751ed'),
+      message: uiText('sideNotes.delete.message'),
+      actions: [
+        { label: uiText('auto.77dfd2135f4d'), value: 'cancel', variant: 'ghost' },
+        { label: uiText('auto.f6fdbe48dc54'), value: 'delete', variant: 'danger' }
+      ]
+    })
+    if (choice === 'delete') await remove(id)
+  }
+
+  const beginEdit = (note: SideNoteRecord): void => setEditing(note)
+
+  React.useEffect(() => {
+    const requests = sideNoteEditStore()
+    const answer = (): void => {
+      const note = requests.get()
+      if (!note) return
+      setEditing(note)
+      requests.publish(null)
+    }
+    answer()
+    return requests.subscribe(answer)
+  }, [])
+
+  React.useEffect(() => {
+    const prefill = selectionDrafts.get()
+    if (!prefill) return
+    const seed = (anchor: SideNoteAnchor): void => {
+      selectionDrafts.consume(prefill)
+        setDraft('')
+      setDraftTags([])
+      setAnchorDraft(anchor)
+      setShowCreate(true)
+    }
+    if (prefill.kind === 'web') {
+      if (isWeb && normalizeUrl(prefill.url ?? '') === subjectUrl) seed({ type: 'web-selection', snippet: prefill.snippet })
+      return
+    }
+    if (prefill.kind === 'file' && prefill.path === path && !isWeb) {
+      seed({ type: 'pdf-page', page: prefill.page ?? 1, snippet: prefill.snippet })
+    }
+  }, [path, subjectUrl, isWeb, pendingCreateNonce, selectionDrafts])
+  const sortOptions = (positional
+    ? (['position', 'created', 'updated'] as SortField[])
+    : (['updated', 'created'] as SortField[])
+  ).map((value) => ({ value, label: SORT_LABELS[value] }))
+
+  const openSortMenu = (anchor: HTMLElement): void => {
+    void api.ui.openPopover(
+      () => (
+        <SideNotesSortPopover
+          field={sortField}
+          direction={sortDir}
+          options={sortOptions}
+          onFieldChange={(value) => {
+            const field = value as SortField
+            setSortField(field)
+          }}
+          onDirectionChange={setSortDir}
+          directionForField={(value) => DEFAULT_DIR[value as SortField]}
+        />
+      ),
+      { anchor, align: 'end' },
+      { className: 'sidenote-sort-popover', ariaLabel: uiText('auto.90fd0e9a6276') }
+    )
+  }
+
+  return (
+    <div className="sidenotes-panel">
+      <header className="panel-header sidenotes-header">
+        <div className="panel-header-label sidenotes-title">
+          {isWeb ? <Globe /> : <StickyNote />}
+          <span className="panel-title" title={isWeb ? subjectUrl : undefined}>{isWeb ? webHostLabel(subjectUrl) : uiText('auto.7d660ae8b46e')}</span>
+        </div>
+        <div className="sidenotes-header-actions">
+          {positional && (
+            <button className={`sidenote-icon-btn${aware ? ' active' : ''}`}
+              aria-label={uiText('auto.580535153931')}
+              title={aware ? uiText('auto.df4a8bd943cc') : uiText('auto.7b9b8574c69b')}
+              onClick={() => setAware((v) => !v)}>
+              <Crosshair />
+            </button>
+          )}
+          {anchorStatus.size > 0 && (
+            <button className={`sidenote-icon-btn${filterWarning ? ' active' : ''}`}
+              aria-label={uiText('auto.f61b9fcd0854')} title={uiText('auto.74a3a904b38b')}
+              onClick={() => setFilterWarning((v) => !v)}>
+              <TriangleAlert />
+            </button>
+          )}
+          <button className="sidenote-icon-btn sidenote-sort-menu-btn"
+            aria-label={uiText('auto.90fd0e9a6276')}
+            title={`${sortDir === 'asc' ? uiText('auto.4fee0a06b6e4') : uiText('auto.01e635f27ec2')} · ${SORT_LABELS[sortField]}`}
+            aria-haspopup="dialog" onClick={(event) => openSortMenu(event.currentTarget)}>
+            {sortDir === 'asc' ? <SortAscending /> : <SortDescending />}
+          </button>
+          <button className="sidenote-icon-btn" aria-label={uiText('auto.7a7e81b96c3a')} title={uiText('auto.d48a73614c7f')}
+          onClick={() => {
+            const opening = !showCreate
+            setShowCreate(opening)
+            if (opening) setAnchorDraft(isWeb ? { type: 'none' } : liveDefaultAnchor(path, readActiveContext()))
+            else setDraft('')
+          }}
+          disabled={!hasSubject}>
+            <Plus />
+          </button>
+        </div>
+      </header>
+      {hasSubject ? (
+        <>
+          <div className="search-field-row">
+            <div className="sidenote-search-bar search-field">
+              <Search className="search-field-icon" />
+              <input className="search-field-input" value={search}
+                onChange={(e) => setSearch(e.target.value)} placeholder={uiText('auto.49cd864445a9')} aria-label={uiText('auto.f1b5671b118f')} />
+              {search && (
+                <button className="search-field-action" onClick={() => setSearch('')} aria-label={uiText('auto.b667d6f9f635')}>
+                  <X />
+                </button>
+              )}
+            </div>
+          </div>
+          {showCreate && (
+            <div className="sidenote-create">
+              <api.ui.NoteInput value={draft} onChange={setDraft} context={{ sourcePath: path || undefined }}
+                onSave={() => void create()}
+                onCancel={() => { setShowCreate(false); setDraft(''); setDraftTags([]) }}
+                autoFocus />
+              <api.ui.TagInput value={draftTags} onChange={setDraftTags} />
+              <AnchorEditor path={path} web={isWeb} anchor={anchorDraft} onChange={setAnchorDraft}
+                invalid={!isWeb && draftAnchorStatus !== 'ok'}
+                validationMsg={!isWeb && draftAnchorStatus !== 'ok' ? anchorValidationMsg(anchorDraft, draftAnchorStatus) : undefined} />
+              <div className="sidenote-create-actions">
+                <button className="sidenote-save-btn" onClick={() => void create()} disabled={!draft.trim() || creating}>
+                  {uiText('auto.757092db3c4b')}</button>
+                {scoped.length > 0 && (
+                  <button className="sidenote-cancel-btn" onClick={() => { setShowCreate(false); setDraft(''); setDraftTags([]) }}>{uiText('auto.77dfd2135f4d')}</button>
+                )}
+              </div>
+            </div>
+          )}
+          <div className="sidenote-list" ref={visibleNotes.ref}>
+            {(error || anchorErrors.projection || anchorErrors.draft) && <div role="alert">{error || anchorErrors.projection || anchorErrors.draft} <button type="button" onClick={() => { reload(); setAnchorInfoNonce(n => n + 1) }}>{uiText('sideNotes.action.retry')}</button></div>}
+            {loading ? (
+              <div className="right-sidebar-empty"><p>{uiText('auto.33ce417454bf')}</p></div>
+            ) : display.length ? (
+              visibleNotes.render(index => {
+                const note = display[index]
+                const status = anchorStatus.get(note.id)
+                const invalid = status !== undefined
+                const busy = pending.has(note.id)
+                return (
+                  <article key={note.id} data-visible-key={note.id} data-visible-index={index}
+                    className={`sidenote-card${note.flagged ? ' flagged' : ''}${invalid ? ' invalid' : ''}`}
+                    onClick={() => { selectSideNote(note, 'right_sidebar'); openNote(note, subjectUrl) }}>
+                    <div className="sidenote-card-meta" onClick={(e) => e.stopPropagation()}>
+                      {note.anchor.type !== 'none' && (
+                        <button className="sidenote-anchor-badge"
+                          onClick={() => openNote(note, subjectUrl)} title={note.url ? uiText('auto.9ee309dcedc9') : `${note.path} · ${anchorLabel(note.anchor)}`}>
+                          {!note.url && note.anchor.type === 'markdown-heading' ? note.path.split('/').pop() : anchorLabel(note.anchor)}
+                        </button>
+                      )}
+                      <div className="sidenote-card-btns">
+                        {invalid && status && (
+                          <TriangleAlert className="sidenote-warning-icon" title={anchorValidationMsg(note.anchor, status)} />
+                        )}
+                        <button
+                          className={`sidenote-icon-btn sidenote-flag-btn${note.flagged ? ' active' : ''}`}
+                          aria-label={note.flagged ? uiText('auto.b855c604e861') : uiText('auto.a774409a00c2')} title={note.flagged ? uiText('auto.b855c604e861') : uiText('auto.a774409a00c2')}
+                          disabled={busy} onClick={() => void patch(note.id, { flagged: !note.flagged })}>
+                          <Flag />
+                        </button>
+                        <NoteMenu noteId={note.id} openId={menuId} setOpenId={setMenuId}
+                          onEdit={() => beginEdit(note)}
+                          onDelete={() => { void confirmRemove(note.id) }}
+                          disabled={busy} />
+                      </div>
+                    </div>
+
+                    {(
+                      <>
+                        <api.ui.MarkdownView className="sidenote-markdown" value={note.note}
+                          context={{ ref: { pluginId: 'sideNotes', sourceId: 'notes', itemId: note.id }, sourcePath: note.path || undefined }}
+                          onChange={(value) => { void patch(note.id, { note: value }) }} />
+                        {note.tags && note.tags.length > 0 && (
+                          <div className="sidenote-tags-view" onClick={(e) => e.stopPropagation()}>
+                            {note.tags.map((tag) => (
+                              <span key={tag} className="sidenote-tag-view-pill">#{tag}</span>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </article>
+                )
+              })
+            ) : (
+              <div className="right-sidebar-empty"><p>{search ? uiText('auto.b690846c83ff') : aware && positional ? uiText('auto.8f4043581269') : isWeb ? uiText('auto.8c8077ac2313') : uiText('auto.31b291dd535e')}</p></div>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="right-sidebar-empty"><p>{uiText('auto.34f6835f5ddf')}</p></div>
+      )}
+      {editing && <SideNoteEditModal
+        key={editing.id}
+        note={editing}
+        onSaved={(saved) => {
+          setNotes((current) => current.map((note) => note.id === saved.id ? saved : note))
+          selectSideNote(saved, 'right_sidebar')
+        }}
+        onClose={() => setEditing(null)}
+      />}
+    </div>
+  )
+}

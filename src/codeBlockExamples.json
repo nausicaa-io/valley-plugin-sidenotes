@@ -1,0 +1,28 @@
+{
+  "sidenotes": [
+    {
+      "id": "currentNote",
+      "label": "Current note",
+      "labelKey": "markdown.examples.currentNote",
+      "code": "limit: 10"
+    },
+    {
+      "id": "otherFile",
+      "label": "Another file",
+      "labelKey": "markdown.examples.otherFile",
+      "code": "file: Apple/The Macintosh.md\nlimit: 10"
+    },
+    {
+      "id": "flagged",
+      "label": "Flagged notes",
+      "labelKey": "markdown.examples.flagged",
+      "code": "file: Apple/The Macintosh.md\nflagged: true\nlimit: 10"
+    },
+    {
+      "id": "filtered",
+      "label": "Filtered results",
+      "labelKey": "markdown.examples.filtered",
+      "code": "file: Apple/The Macintosh.md\ntag: #focus\nlimit: 10"
+    }
+  ]
+}
