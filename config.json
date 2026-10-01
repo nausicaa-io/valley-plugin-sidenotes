@@ -286,7 +286,11 @@
         "type": "number",
         "default": 10,
         "description": "In Aware mode, audio/video notes within ± this many seconds of the current playback time are shown.",
-        "descriptionKey": "auto.204e47f6d7a2"
+        "descriptionKey": "auto.204e47f6d7a2",
+        "schema": {
+          "type": "number",
+          "minimum": 0
+        }
       },
       {
         "key": "filterTypes",
@@ -300,7 +304,13 @@
           ".pdf"
         ],
         "description": "Preferred file extensions appear first, in this order. Extensions from saved SideNotes are added automatically, even when this list is empty.",
-        "descriptionKey": "plugin.sideNotes.field.filterTypesDesc"
+        "descriptionKey": "plugin.sideNotes.field.filterTypesDesc",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     ]
   },
