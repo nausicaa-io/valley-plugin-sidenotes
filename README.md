@@ -71,3 +71,7 @@ Use Node 24.19.0 and npm 11.17.0. Run `npm ci` and `npm run check` in this direc
 The package owns `locales/en.json`, `de.json`, `es.json`, `fr.json`, and `zh-CN.json`. Identity translations use `manifest.name` and `manifest.description`, including while disabled; fallback stays within the package’s English catalog. Authors and their URLs are paired arrays.
 
 Version 2.1 coalesces changes arriving during a pending note read into a fresh result. Panels retain loaded notes after a failed refresh, expose a localized Retry action, and ignore results completed after unmount.
+
+## Workflow integration
+
+Explicit Workflow blocks reuse this package’s published owner commands through the authenticated SDK command bridge. Configure the application window and required targets before running. Schemas and owner identities are pinned; contract changes require reloading the integration. Writes retain existing grants, revision checks, undo behavior and authoritative receipts. Preview and block insertion perform no commands.

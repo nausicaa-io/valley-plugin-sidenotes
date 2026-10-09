@@ -322,6 +322,1061 @@
     "zh-CN": "runtime/locales/zh-CN.json"
   },
   "runtime": {
-    "ui": "runtime/index.js"
+    "ui": "runtime/index.js",
+    "backend": "runtime/backend.js",
+    "services": [
+      {
+        "id": "workflow.provider",
+        "version": "1.0.0",
+        "method": "workflow.execute",
+        "operation": true,
+        "request": {
+          "type": "unknown"
+        },
+        "response": {
+          "type": "unknown"
+        },
+        "metadata": {
+          "workflow": {
+            "providerId": "sideNotes",
+            "providerVersion": "1.0.0",
+            "nodes": [
+              {
+                "id": "sideNotes.list",
+                "type": "action",
+                "version": "1.0.0",
+                "displayName": "List annotations",
+                "description": "SideNotes: List annotations. Reuses the owning handler, grants and revisions in the selected window. Confirmed data is exposed as result, with its authoritative receipt. Insertion and previews never dispatch.",
+                "effect": "read",
+                "idempotent": true,
+                "executionMode": "item",
+                "inputs": [
+                  {
+                    "id": "input",
+                    "label": "Input",
+                    "dataType": "json",
+                    "schema": {
+                      "type": "object"
+                    }
+                  }
+                ],
+                "outputs": [
+                  {
+                    "id": "result",
+                    "label": "Confirmed result",
+                    "dataType": "json",
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "result": {},
+                        "receipt": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "revision": {
+                              "type": "integer"
+                            },
+                            "status": {
+                              "const": "completed"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "revision",
+                            "status"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "result",
+                        "receipt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                ],
+                "parameterSchema": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "query": {
+                      "type": "string"
+                    },
+                    "flagged": {
+                      "type": "boolean"
+                    },
+                    "targetWindowId": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "title": "Application window",
+                      "description": "Explicit authenticated application window ID. Uses the owning plugin view in that window.",
+                      "ui": {
+                        "control": "number",
+                        "step": 1
+                      }
+                    },
+                    "commandRevision": {
+                      "description": "Optional owner revision from a previous inspection. Native expectedRevision fields remain separate."
+                    }
+                  },
+                  "required": [
+                    "targetWindowId"
+                  ],
+                  "additionalProperties": false,
+                  "$schema": "http://json-schema.org/draft-07/schema#"
+                },
+                "inputSchema": {
+                  "type": "object"
+                },
+                "outputSchema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {},
+                    "receipt": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "revision": {
+                          "type": "integer"
+                        },
+                        "status": {
+                          "const": "completed"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "revision",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "result",
+                    "receipt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "id": "sideNotes.get",
+                "type": "action",
+                "version": "1.0.0",
+                "displayName": "Get annotation",
+                "description": "SideNotes: Get annotation. Reuses the owning handler, grants and revisions in the selected window. Confirmed data is exposed as result, with its authoritative receipt. Insertion and previews never dispatch.",
+                "effect": "read",
+                "idempotent": true,
+                "executionMode": "item",
+                "inputs": [
+                  {
+                    "id": "input",
+                    "label": "Input",
+                    "dataType": "json",
+                    "schema": {
+                      "type": "object"
+                    }
+                  }
+                ],
+                "outputs": [
+                  {
+                    "id": "result",
+                    "label": "Confirmed result",
+                    "dataType": "json",
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "result": {},
+                        "receipt": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "revision": {
+                              "type": "integer"
+                            },
+                            "status": {
+                              "const": "completed"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "revision",
+                            "status"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "result",
+                        "receipt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                ],
+                "parameterSchema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "targetWindowId": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "title": "Application window",
+                      "description": "Explicit authenticated application window ID. Uses the owning plugin view in that window.",
+                      "ui": {
+                        "control": "number",
+                        "step": 1
+                      }
+                    },
+                    "commandRevision": {
+                      "description": "Optional owner revision from a previous inspection. Native expectedRevision fields remain separate."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "targetWindowId"
+                  ],
+                  "additionalProperties": false,
+                  "$schema": "http://json-schema.org/draft-07/schema#"
+                },
+                "inputSchema": {
+                  "type": "object"
+                },
+                "outputSchema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {},
+                    "receipt": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "revision": {
+                          "type": "integer"
+                        },
+                        "status": {
+                          "const": "completed"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "revision",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "result",
+                    "receipt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "id": "sideNotes.open",
+                "type": "action",
+                "version": "1.0.0",
+                "displayName": "Open annotation",
+                "description": "SideNotes: Open annotation. Reuses the owning handler, grants and revisions in the selected window. Confirmed data is exposed as result, with its authoritative receipt. Insertion and previews never dispatch.",
+                "effect": "execute",
+                "idempotent": false,
+                "executionMode": "item",
+                "inputs": [
+                  {
+                    "id": "input",
+                    "label": "Input",
+                    "dataType": "json",
+                    "schema": {
+                      "type": "object"
+                    }
+                  }
+                ],
+                "outputs": [
+                  {
+                    "id": "result",
+                    "label": "Confirmed result",
+                    "dataType": "json",
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "result": {},
+                        "receipt": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "revision": {
+                              "type": "integer"
+                            },
+                            "status": {
+                              "const": "completed"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "revision",
+                            "status"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "result",
+                        "receipt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                ],
+                "parameterSchema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "targetWindowId": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "title": "Application window",
+                      "description": "Explicit authenticated application window ID. Uses the owning plugin view in that window.",
+                      "ui": {
+                        "control": "number",
+                        "step": 1
+                      }
+                    },
+                    "commandRevision": {
+                      "description": "Optional owner revision from a previous inspection. Native expectedRevision fields remain separate."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "targetWindowId"
+                  ],
+                  "additionalProperties": false,
+                  "$schema": "http://json-schema.org/draft-07/schema#"
+                },
+                "inputSchema": {
+                  "type": "object"
+                },
+                "outputSchema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {},
+                    "receipt": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "revision": {
+                          "type": "integer"
+                        },
+                        "status": {
+                          "const": "completed"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "revision",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "result",
+                    "receipt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "id": "sideNotes.create",
+                "type": "action",
+                "version": "1.0.0",
+                "displayName": "Create annotation",
+                "description": "SideNotes: Create annotation. Reuses the owning handler, grants and revisions in the selected window. Confirmed data is exposed as result, with its authoritative receipt. Insertion and previews never dispatch.",
+                "effect": "write",
+                "idempotent": false,
+                "executionMode": "item",
+                "inputs": [
+                  {
+                    "id": "input",
+                    "label": "Input",
+                    "dataType": "json",
+                    "schema": {
+                      "type": "object"
+                    }
+                  }
+                ],
+                "outputs": [
+                  {
+                    "id": "result",
+                    "label": "Confirmed result",
+                    "dataType": "json",
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "result": {},
+                        "receipt": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "revision": {
+                              "type": "integer"
+                            },
+                            "status": {
+                              "const": "completed"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "revision",
+                            "status"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "result",
+                        "receipt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                ],
+                "parameterSchema": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "note": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "anchor": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "none"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "pdf-page"
+                            },
+                            "page": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "snippet": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "page"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "media-time"
+                            },
+                            "seconds": {
+                              "type": "number",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "seconds"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "markdown-line"
+                            },
+                            "line": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "snippet": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "line"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "markdown-heading"
+                            },
+                            "heading": {
+                              "type": "string"
+                            },
+                            "line": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "heading"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "markdown-snippet"
+                            },
+                            "snippet": {
+                              "type": "string"
+                            },
+                            "line": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "snippet"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "web-selection"
+                            },
+                            "snippet": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "snippet"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "targetWindowId": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "title": "Application window",
+                      "description": "Explicit authenticated application window ID. Uses the owning plugin view in that window.",
+                      "ui": {
+                        "control": "number",
+                        "step": 1
+                      }
+                    },
+                    "commandRevision": {
+                      "description": "Optional owner revision from a previous inspection. Native expectedRevision fields remain separate."
+                    }
+                  },
+                  "required": [
+                    "note",
+                    "targetWindowId"
+                  ],
+                  "additionalProperties": false,
+                  "$schema": "http://json-schema.org/draft-07/schema#"
+                },
+                "inputSchema": {
+                  "type": "object"
+                },
+                "outputSchema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {},
+                    "receipt": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "revision": {
+                          "type": "integer"
+                        },
+                        "status": {
+                          "const": "completed"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "revision",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "result",
+                    "receipt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "id": "sideNotes.update",
+                "type": "action",
+                "version": "1.0.0",
+                "displayName": "Edit annotation",
+                "description": "SideNotes: Edit annotation. Reuses the owning handler, grants and revisions in the selected window. Confirmed data is exposed as result, with its authoritative receipt. Insertion and previews never dispatch.",
+                "effect": "write",
+                "idempotent": false,
+                "executionMode": "item",
+                "inputs": [
+                  {
+                    "id": "input",
+                    "label": "Input",
+                    "dataType": "json",
+                    "schema": {
+                      "type": "object"
+                    }
+                  }
+                ],
+                "outputs": [
+                  {
+                    "id": "result",
+                    "label": "Confirmed result",
+                    "dataType": "json",
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "result": {},
+                        "receipt": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "revision": {
+                              "type": "integer"
+                            },
+                            "status": {
+                              "const": "completed"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "revision",
+                            "status"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "result",
+                        "receipt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                ],
+                "parameterSchema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "values": {
+                      "type": "object",
+                      "properties": {
+                        "note": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "tags": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "flagged": {
+                          "type": "boolean"
+                        },
+                        "anchor": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "const": "none"
+                                }
+                              },
+                              "required": [
+                                "type"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "const": "pdf-page"
+                                },
+                                "page": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "snippet": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "page"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "const": "media-time"
+                                },
+                                "seconds": {
+                                  "type": "number",
+                                  "minimum": 0
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "seconds"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "const": "markdown-line"
+                                },
+                                "line": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "snippet": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "line"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "const": "markdown-heading"
+                                },
+                                "heading": {
+                                  "type": "string"
+                                },
+                                "line": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "heading"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "const": "markdown-snippet"
+                                },
+                                "snippet": {
+                                  "type": "string"
+                                },
+                                "line": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "snippet"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "const": "web-selection"
+                                },
+                                "snippet": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "snippet"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      },
+                      "required": [],
+                      "additionalProperties": false
+                    },
+                    "expectedUpdatedAt": {
+                      "type": "string"
+                    },
+                    "targetWindowId": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "title": "Application window",
+                      "description": "Explicit authenticated application window ID. Uses the owning plugin view in that window.",
+                      "ui": {
+                        "control": "number",
+                        "step": 1
+                      }
+                    },
+                    "commandRevision": {
+                      "description": "Optional owner revision from a previous inspection. Native expectedRevision fields remain separate."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "values",
+                    "targetWindowId"
+                  ],
+                  "additionalProperties": false,
+                  "$schema": "http://json-schema.org/draft-07/schema#"
+                },
+                "inputSchema": {
+                  "type": "object"
+                },
+                "outputSchema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {},
+                    "receipt": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "revision": {
+                          "type": "integer"
+                        },
+                        "status": {
+                          "const": "completed"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "revision",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "result",
+                    "receipt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "id": "sideNotes.delete",
+                "type": "action",
+                "version": "1.0.0",
+                "displayName": "Delete annotation",
+                "description": "SideNotes: Delete annotation. Reuses the owning handler, grants and revisions in the selected window. Confirmed data is exposed as result, with its authoritative receipt. Insertion and previews never dispatch.",
+                "effect": "write",
+                "idempotent": false,
+                "executionMode": "item",
+                "inputs": [
+                  {
+                    "id": "input",
+                    "label": "Input",
+                    "dataType": "json",
+                    "schema": {
+                      "type": "object"
+                    }
+                  }
+                ],
+                "outputs": [
+                  {
+                    "id": "result",
+                    "label": "Confirmed result",
+                    "dataType": "json",
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "result": {},
+                        "receipt": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "revision": {
+                              "type": "integer"
+                            },
+                            "status": {
+                              "const": "completed"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "revision",
+                            "status"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "result",
+                        "receipt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                ],
+                "parameterSchema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "targetWindowId": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "title": "Application window",
+                      "description": "Explicit authenticated application window ID. Uses the owning plugin view in that window.",
+                      "ui": {
+                        "control": "number",
+                        "step": 1
+                      }
+                    },
+                    "commandRevision": {
+                      "description": "Optional owner revision from a previous inspection. Native expectedRevision fields remain separate."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "targetWindowId"
+                  ],
+                  "additionalProperties": false,
+                  "$schema": "http://json-schema.org/draft-07/schema#"
+                },
+                "inputSchema": {
+                  "type": "object"
+                },
+                "outputSchema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {},
+                    "receipt": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "revision": {
+                          "type": "integer"
+                        },
+                        "status": {
+                          "const": "completed"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "revision",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "result",
+                    "receipt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "workflow.catalog",
+        "version": "1.0.0",
+        "method": "workflow.catalog",
+        "operation": true,
+        "request": {
+          "type": "unknown"
+        },
+        "response": {
+          "type": "unknown"
+        }
+      }
+    ],
+    "largeDataOperations": [
+      "workflow.execute"
+    ]
   }
 }

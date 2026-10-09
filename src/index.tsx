@@ -11,6 +11,7 @@ import type {
   TextSelectionAction,
   TextSelectionDetail,
   ValleyPluginApi,
+  PluginCommand,
   ValleyPluginModule
 } from '@valley/plugin-sdk'
 import { TEXT_SELECTION_ACTION_V1 } from '@valley/plugin-sdk'
@@ -75,19 +76,22 @@ export function register(api: ValleyPluginApi): () => void {
     run: capture
   } satisfies TextSelectionAction)
 
-  const offHighlightCmd = api.commands.register({
+  const highlightCommand: PluginCommand<void, null, 'execute'> & { outputSchema: Record<string, unknown> } = {
     id: 'highlight-selection',
     label: 'Create SideNote from selection', labelKey: 'auto.94fd67ed6c0c',
     hotkey: 'Mod-Shift-h',
-    sideEffect: 'read',
-    run: () => {
-      if (!mutation.isActive()) return undefined
+    sideEffect: 'execute',
+    outputSchema: { type: 'null' },
+    input: { schema: { type: 'object', properties: {}, additionalProperties: false }, parse: () => undefined },
+    run: async () => {
+      if (!mutation.isActive()) return null
       const path = api.getState().activePath
       const detail = path && classifyFilePath(path) === 'pdf' ? extractFromSelection(path, api.workspace.getTextSelection()) : null
-      if (detail) void capture({ surface: 'pdf', ...detail })
-      return undefined
+      if (detail) await capture({ surface: 'pdf', ...detail })
+      return null
     }
-  })
+  }
+  const offHighlightCmd = api.commands.register(highlightCommand)
 
   api.registerView('sideNotes.panel', Panel)
   api.registerView('sideNotes.flagged', FlaggedPanel)

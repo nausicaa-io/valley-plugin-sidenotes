@@ -7,7 +7,7 @@ import type { JumpAnchor } from '@valley/plugin-sdk/types'
  * `workspace.openFile`, so the shared `JumpAnchor` union (and the host's
  * anchor-handling) stays untouched.
  */
-export type SideNoteAnchor = Exclude<JumpAnchor, { type: 'dataset-record' }> | { type: 'web-selection'; snippet: string }
+export type SideNoteAnchor = Exclude<JumpAnchor, { type: 'dataset-record' | 'text-line' | 'ebook-page' | 'ebook-location' }> | { type: 'web-selection'; snippet: string }
 export type AnchorType = SideNoteAnchor['type']
 
 export interface SideNoteFileKey {

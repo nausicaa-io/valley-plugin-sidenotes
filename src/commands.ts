@@ -1,13 +1,13 @@
-import { type ValleyPluginApi } from '@valley/plugin-sdk'
-import { appendNote, captureNoteMutation, copyNote, deleteNote, makeNote, makeWebNote, updateNote, type DocumentRevision, type NoteMutationSession } from './data'
+import { type PluginCommand, type ValleyPluginApi } from '@valley/plugin-sdk'
+import { appendNoteOrThrow, beforeEffect, captureNoteMutation, copyNote, deleteNoteOrThrow, makeNote, makeWebNote, updateNoteOrThrow, type DocumentRevision, type NoteMutationSession } from './data'
 import { anchorOptions, anchorOptionsForWeb, enrichTextAnchor } from './anchors'
 import { normalizeUrl } from './web'
 import type { SideNoteAnchor, SideNoteRecord } from './types'
 import { sideNoteEditStore } from './runtime'
 import { AnchorReads } from './anchorReads'
 
-const text = { type: 'string' }
-const tags = { type: 'array', items: text }
+const text = { type: 'string', maxLength: 1048576 }
+const tags = { type: 'array', items: text, maxItems: 10000 }
 const object = (properties: Record<string, unknown>, required: string[] = []) => ({ type: 'object', properties, required, additionalProperties: false })
 const variant = (type: string, properties: Record<string, unknown> = {}, required: string[] = []) => object({ type: { const: type }, ...properties }, ['type', ...required])
 export const anchorSchema = { oneOf: [
@@ -18,7 +18,18 @@ export const anchorSchema = { oneOf: [
   variant('markdown-snippet', { snippet: text, line: { type: 'integer', minimum: 1 } }, ['snippet']),
   variant('web-selection', { snippet: text }, ['snippet'])
 ] }
+export const noteResultSchema = object({ id: text, path: text, url: text, pathHistory: tags, note: text, flagged: { type: 'boolean' }, tags, anchor: anchorSchema, fileKey: object({ dev: { type: 'number' }, ino: { type: 'number' } }, ['dev', 'ino']), createdAt: text, updatedAt: text }, ['id', 'path', 'pathHistory', 'note', 'tags', 'anchor', 'createdAt', 'updatedAt'])
 export const noteValuesSchema = object({ note: { type: 'string', minLength: 1 }, tags, flagged: { type: 'boolean' }, anchor: anchorSchema })
+
+function refused(code: string, message: string): never {
+  throw Object.assign(new Error(message), { code, outcome: 'not-applied' as const, retryable: false })
+}
+
+async function committedSideNote(id: string, session: NoteMutationSession): Promise<SideNoteRecord> {
+  try { return await requireSideNote(id, session) } catch (error) {
+    throw Object.assign(error instanceof Error ? error : new Error(String(error)), { outcome: 'unknown' as const, retryable: false })
+  }
+}
 
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Expected an object.')
@@ -89,33 +100,58 @@ export async function requireSideNote(id: string, session = captureNoteMutation(
   const notes = await session.reader.load({ kind: 'ids', ids: [id] })
   session.assertActive()
   const note = notes.find((entry) => entry.id === id)
-  if (!note) throw new Error('The SideNote no longer exists.')
+  if (!note) refused('TARGET_NOT_FOUND', 'The SideNote no longer exists.')
   return note
 }
 
+async function settleTracked(write: () => Promise<void>, forget: () => void): Promise<void> {
+  try { await write() } catch (error) {
+    if ((error as { outcome?: unknown } | null)?.outcome !== 'not-applied') forget()
+    throw error
+  }
+  forget()
+}
+
+async function unchangedSideNote(id: string, expected: SideNoteRecord | undefined, session: NoteMutationSession): Promise<void> {
+  await beforeEffect(async () => {
+    session.assertActive()
+    if (!expected) refused('REVISION_CONFLICT', 'The SideNote state after this operation is unknown. Newer work was preserved.')
+    const current = await requireSideNote(id, session)
+    if (JSON.stringify(current) !== JSON.stringify(expected)) refused('REVISION_CONFLICT', 'The SideNote changed after this operation. Newer work was preserved.')
+  })
+}
+
 export async function saveNoteValues(id: string, values: ReturnType<typeof parseNoteValues>, expectedUpdatedAt?: string, documentRevision?: DocumentRevision, session = captureNoteMutation()) {
-  session.assertActive()
   const admitted = copyValues(values)
   const revision = documentRevision ? { ...documentRevision } : undefined
-  const previous = copyNote(await requireSideNote(id, session))
-  session.assertActive()
-  if (expectedUpdatedAt !== undefined && previous.updatedAt !== expectedUpdatedAt) throw new Error('This SideNote changed elsewhere. Your draft has been preserved; reload it before saving.')
-  let anchor = admitted.anchor ?? previous.anchor
-  if (admitted.anchor) {
-    const allowed = previous.url ? anchorOptionsForWeb() : anchorOptions(previous.path)
-    if (!allowed.includes(anchor.type)) throw new Error('This anchor does not apply to the SideNote subject.')
-    anchor = await enrichAnchor(previous.path, anchor, session)
+  const { previous, next } = await beforeEffect(async () => {
     session.assertActive()
+    const previous = copyNote(await requireSideNote(id, session))
+    session.assertActive()
+    if (expectedUpdatedAt !== undefined && previous.updatedAt !== expectedUpdatedAt) refused('REVISION_CONFLICT', 'This SideNote changed elsewhere. Your draft has been preserved; reload it before saving.')
+    let anchor = admitted.anchor ?? previous.anchor
+    if (admitted.anchor) {
+      const allowed = previous.url ? anchorOptionsForWeb() : anchorOptions(previous.path)
+      if (!allowed.includes(anchor.type)) refused('INVALID_INPUT', 'This anchor does not apply to the SideNote subject.')
+      anchor = await enrichAnchor(previous.path, anchor, session)
+      session.assertActive()
+    }
+    return { previous, next: copyNote({ ...previous, ...admitted, anchor, updatedAt: new Date().toISOString() }) }
+  })
+  await updateNoteOrThrow(id, next, previous.updatedAt, revision, session)
+  const committed = copyNote(await committedSideNote(id, session))
+  let expected = committed
+  const restore = async (value: SideNoteRecord): Promise<void> => {
+    const current = await beforeEffect(async () => {
+      session.assertActive()
+      const current = await requireSideNote(id, session)
+      if (JSON.stringify(current) !== JSON.stringify(expected)) refused('REVISION_CONFLICT', 'The SideNote changed after this operation. Newer work was preserved.')
+      return current
+    })
+    await updateNoteOrThrow(id, value, current.updatedAt, undefined, session)
+    expected = copyNote(await committedSideNote(id, session))
   }
-  const next = copyNote({ ...previous, ...admitted, anchor, updatedAt: new Date().toISOString() })
-  if (!(await updateNote(id, next, previous.updatedAt, revision, session))) throw new Error('Could not save the SideNote.')
-  return { value: copyNote(next), revert: { label: 'Edit SideNote', run: async () => {
-    session.assertActive()
-    if (!(await updateNote(id, previous, undefined, undefined, session))) throw new Error('Could not restore the SideNote.')
-  }, reapply: async () => {
-    session.assertActive()
-    if (!(await updateNote(id, next, undefined, undefined, session))) throw new Error('Could not reapply the SideNote edit.')
-  } } }
+  return { value: copyNote(committed), revert: { label: 'Edit SideNote', run: () => restore(previous), reapply: () => restore(next) } }
 }
 
 export async function openSideNoteSubject(api: ValleyPluginApi, note: Pick<SideNoteRecord, 'path' | 'url' | 'anchor'>, assertActive?: () => void): Promise<void> {
@@ -125,11 +161,11 @@ export async function openSideNoteSubject(api: ValleyPluginApi, note: Pick<SideN
   if (subject.url) {
     const result = await api.links.open(subject.url)
     session.assertActive()
-    if (result.status === 'failed' || result.status === 'unavailable') throw new Error(result.message ?? 'Destination unavailable')
+    if (result.status === 'failed' || result.status === 'unavailable') refused('TARGET_UNAVAILABLE', result.message ?? 'Destination unavailable')
   } else {
     const file = await api.vault.fileInfo(subject.path)
     session.assertActive()
-    if (!file) throw new Error('The annotation file no longer exists.')
+    if (!file) refused('TARGET_NOT_FOUND', 'The annotation file no longer exists.')
     api.workspace.openFile(subject.path, subject.anchor.type === 'web-selection' ? undefined : subject.anchor)
   }
 }
@@ -147,8 +183,12 @@ export function registerSideNoteCommands(api: ValleyPluginApi): () => void {
     return value
   }
   const idInput = { schema: object({ id: text }, ['id']), parse: (raw: unknown) => ({ id: requiredText(record(raw).id, 'SideNote id') }), fromCli: (args: string[]) => ({ id: args[0] }) }
+  const register = <I, O, E extends 'read' | 'write' | 'execute'>(command: PluginCommand<I, O, E>): (() => void) => {
+    const registration: PluginCommand<I, O, E> & { outputSchema: Record<string, unknown> } = { ...command, outputSchema: command.id === 'list' ? { type: 'array', items: noteResultSchema, maxItems: 10000 } : noteResultSchema }
+    return api.commands.register(registration)
+  }
   const offs = [
-    api.commands.register({ id: 'list', label: 'SideNotes: List annotations', labelKey: 'sideNotes.command.list', paletteSafe: false, sideEffect: 'read', input: {
+    register({ id: 'list', label: 'SideNotes: List annotations', labelKey: 'sideNotes.command.list', paletteSafe: false, sideEffect: 'read', input: {
       schema: object({ path: text, url: text, query: text, flagged: { type: 'boolean' } }),
       parse: (raw) => {
         const input = raw == null ? {} : record(raw)
@@ -163,8 +203,8 @@ export function registerSideNoteCommands(api: ValleyPluginApi): () => void {
       session.assertActive()
       return notes.filter((note) => (!accepted.path || note.path === accepted.path) && (!accepted.url || note.url === normalizeUrl(accepted.url)) && (accepted.flagged === undefined || !!note.flagged === accepted.flagged) && (!accepted.query || `${note.note} ${note.tags.join(' ')}`.toLowerCase().includes(accepted.query.toLowerCase())))
     } }),
-    api.commands.register({ id: 'get', label: 'SideNotes: Get annotation', labelKey: 'sideNotes.command.get', paletteSafe: false, sideEffect: 'read', input: idInput, run: ({ id }) => requireSideNote(id, session) }),
-    api.commands.register({ id: 'open', label: 'SideNotes: Open annotation', labelKey: 'sideNotes.command.open', paletteSafe: false, sideEffect: 'read', input: idInput, run: async ({ id }) => {
+    register({ id: 'get', label: 'SideNotes: Get annotation', labelKey: 'sideNotes.command.get', paletteSafe: false, sideEffect: 'read', input: idInput, run: ({ id }) => requireSideNote(id, session) }),
+    register({ id: 'open', label: 'SideNotes: Open annotation', labelKey: 'sideNotes.command.open', paletteSafe: false, sideEffect: 'execute', input: idInput, run: async ({ id }) => {
       const note = await requireSideNote(id, session)
       await openSideNoteSubject(api, note, session.assertActive)
       session.assertActive()
@@ -173,7 +213,7 @@ export function registerSideNoteCommands(api: ValleyPluginApi): () => void {
       edits.publish(note)
       return note
     } }),
-    api.commands.register({
+    register({
       id: 'create',
       label: 'SideNotes: Create annotation',
       labelKey: 'sideNotes.command.create',
@@ -191,30 +231,35 @@ export function registerSideNoteCommands(api: ValleyPluginApi): () => void {
       }
     },
       run: async (input) => {
-      session.assertActive()
       const accepted = copyValues(input)
-      if (accepted.path) {
-        const file = await api.vault.fileInfo(accepted.path)
+      const note = await beforeEffect(async () => {
         session.assertActive()
-        if (!file) throw new Error('The annotation file does not exist.')
-      }
-      const anchor = accepted.anchor ?? { type: 'none' as const }
-      if (!(accepted.url ? anchorOptionsForWeb() : anchorOptions(accepted.path)).includes(anchor.type)) throw new Error('This anchor does not apply to the annotation subject.')
-      const note = accepted.url ? makeWebNote(normalizeUrl(accepted.url), accepted.note!, anchor, accepted.tags) : makeNote(accepted.path, accepted.note!, await enrichAnchor(accepted.path, anchor, session), accepted.tags)
-      session.assertActive()
-      if (!(await appendNote(note, session))) throw new Error('Could not create the SideNote.')
+        if (accepted.path) {
+          const file = await api.vault.fileInfo(accepted.path)
+          session.assertActive()
+          if (!file) refused('TARGET_NOT_FOUND', 'The annotation file does not exist.')
+        }
+        const anchor = accepted.anchor ?? { type: 'none' as const }
+        if (!(accepted.url ? anchorOptionsForWeb() : anchorOptions(accepted.path)).includes(anchor.type)) refused('INVALID_INPUT', 'This anchor does not apply to the annotation subject.')
+        const note = accepted.url ? makeWebNote(normalizeUrl(accepted.url), accepted.note!, anchor, accepted.tags) : makeNote(accepted.path, accepted.note!, await enrichAnchor(accepted.path, anchor, session), accepted.tags)
+        session.assertActive()
+        return note
+      })
+      await appendNoteOrThrow(note, session)
+      let expected: SideNoteRecord | undefined = copyNote(await committedSideNote(note.id, session))
       return { value: copyNote(note), revert: { label: 'Create SideNote', run: async () => {
-        session.assertActive()
-        await deleteNote(note.id, session)
+        await unchangedSideNote(note.id, expected, session)
+        await settleTracked(() => deleteNoteOrThrow(note.id, session), () => { expected = undefined })
       }, reapply: async () => {
         session.assertActive()
-        await appendNote(note, session)
+        await appendNoteOrThrow(note, session)
+        expected = copyNote(await committedSideNote(note.id, session))
       } } }
     },
       revision: (input) => revision(input),
       preview: (input) => { session.assertActive(); return { changes: input } }
     }),
-    api.commands.register({
+    register({
       id: 'update',
       label: 'SideNotes: Edit annotation',
       labelKey: 'sideNotes.command.update',
@@ -228,7 +273,7 @@ export function registerSideNoteCommands(api: ValleyPluginApi): () => void {
       revision: (input) => revision(input),
       preview: (input) => { session.assertActive(); return { changes: input } }
     }),
-    api.commands.register({
+    register({
       id: 'delete',
       label: 'SideNotes: Delete annotation',
       labelKey: 'sideNotes.command.delete',
@@ -236,15 +281,20 @@ export function registerSideNoteCommands(api: ValleyPluginApi): () => void {
       sideEffect: 'write',
       input: idInput,
       run: async ({ id }) => {
-      const note = copyNote(await requireSideNote(id, session))
-      session.assertActive()
-      if (!(await deleteNote(id, session))) throw new Error('Could not delete the SideNote.')
+      const note = await beforeEffect(async () => {
+        const note = copyNote(await requireSideNote(id, session))
+        session.assertActive()
+        return note
+      })
+      await deleteNoteOrThrow(id, session)
+      let expected: SideNoteRecord | undefined
       return { value: copyNote(note), revert: { label: 'Delete SideNote', run: async () => {
         session.assertActive()
-        await appendNote(note, session)
+        await appendNoteOrThrow(note, session)
+        expected = copyNote(await committedSideNote(id, session))
       }, reapply: async () => {
-        session.assertActive()
-        await deleteNote(id, session)
+        await unchangedSideNote(id, expected, session)
+        await settleTracked(() => deleteNoteOrThrow(id, session), () => { expected = undefined })
       } } }
     },
       revision: (input) => revision(input),

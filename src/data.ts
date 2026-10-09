@@ -252,65 +252,143 @@ export function makeWebNote(url: string, text: string, anchor: SideNoteAnchor, t
   }
 }
 
+type NoteWriteOutcome = 'not-applied' | 'unknown'
+const STORE_REFUSAL_CODES: Record<string, string> = { conflict: 'REVISION_CONFLICT', 'document-not-found': 'TARGET_NOT_FOUND' }
+
+function failure(error: unknown): Error & { code?: unknown; outcome?: unknown; outcomeUnknown?: unknown; retryable?: unknown } {
+  return error instanceof Error ? error : new Error(String(error))
+}
+
+function settled(error: unknown, outcome: NoteWriteOutcome, code: string): Error {
+  const problem = failure(error)
+  const retryable = outcome === 'not-applied' && problem.retryable === true
+  return Object.assign(problem, { code: typeof problem.code === 'string' ? STORE_REFUSAL_CODES[problem.code] ?? problem.code : code, outcome, retryable })
+}
+
+function isUnknown(error: unknown): boolean {
+  const problem = failure(error)
+  return problem.outcome === 'unknown' || problem.outcomeUnknown === true
+}
+
+function refusedBeforeEffect(error: unknown, code = 'TARGET_UNAVAILABLE'): Error {
+  return isUnknown(error) ? failure(error) : settled(error, 'not-applied', code)
+}
+
+/** Classifies a rejected host write: a coded store refusal is not applied; anything else may have committed. */
+function rejectedWrite(error: unknown): Error {
+  if (isUnknown(error)) return settled(error, 'unknown', 'OUTCOME_UNKNOWN')
+  const problem = failure(error)
+  return typeof problem.code === 'string' ? settled(problem, 'not-applied', problem.code) : problem
+}
+
+function refusal(code: string, message: string): Error {
+  return Object.assign(new Error(message), { code, outcome: 'not-applied' as const, retryable: false })
+}
+
+/** Runs a step that happens before any write is dispatched; its failures become known no-effect refusals. */
+export async function beforeEffect<T>(step: () => Promise<T>): Promise<T> {
+  try { return await step() } catch (error) { throw refusedBeforeEffect(error) }
+}
+
+async function dispatchWrite<T>(write: () => Promise<T>): Promise<T> {
+  try { return await write() } catch (error) { throw rejectedWrite(error) }
+}
+
+async function insertNote(next: SideNoteRecord, session: NoteMutationSession): Promise<void> {
+  await beforeEffect(async () => session.assertActive())
+  await dispatchWrite(() => session.api.data.transaction([
+    { dataset: NOTES_DATASET, operation: 'insert', values: noteRow(next) },
+    ...relationWrites(next)
+  ]))
+}
+
 export async function appendNote(record: SideNoteRecord, session = captureNoteMutation()): Promise<boolean> {
   const next = await withFileKey(copyNote(record), session)
   try {
-    session.assertActive()
-    await session.api.data.transaction([
-      { dataset: NOTES_DATASET, operation: 'insert', values: noteRow(next) },
-      ...relationWrites(next)
-    ])
+    await insertNote(next, session)
     return true
   } catch {
     return false
   }
 }
 
+/** Like appendNote, but rejects with a coded outcome ('not-applied' or 'unknown') instead of returning false. */
+export async function appendNoteOrThrow(record: SideNoteRecord, session = captureNoteMutation()): Promise<void> {
+  const next = await beforeEffect(() => withFileKey(copyNote(record), session))
+  await insertNote(next, session)
+}
+
 export type DocumentRevision = Parameters<NonNullable<NoteInputProps['onRevisionChange']>>[0]
+
+async function writeNoteUpdate(id: string, next: SideNoteRecord, expectedUpdatedAt: string | undefined, revision: DocumentRevision | undefined, session: NoteMutationSession): Promise<void> {
+  const ref = { pluginId: session.api.pluginId, sourceId: 'notes', itemId: id }
+  const { baseline, deletes } = await beforeEffect(async () => {
+    session.assertActive()
+    const baseline = await session.api.documents.read(ref)
+    session.assertActive()
+    if (!baseline) throw refusal('TARGET_NOT_FOUND', 'The SideNote no longer exists.')
+    if (expectedUpdatedAt !== undefined) {
+      const current = await session.api.data.dataset(NOTES_DATASET).get({ id })
+      session.assertActive()
+      if (!current) throw refusal('TARGET_NOT_FOUND', 'The SideNote no longer exists.')
+      if (current.updatedAt !== expectedUpdatedAt) throw refusal('REVISION_CONFLICT', 'This SideNote changed elsewhere. Newer work was preserved.')
+    }
+    const deletes = await relationDeletes(session, id)
+    session.assertActive()
+    return { baseline, deletes }
+  })
+  const row = noteRow(next)
+  delete row.id
+  delete row.note
+  await dispatchWrite(() => session.api.documents.update(ref, {
+    expectedRevision: revision?.expectedRevision ?? baseline.revision,
+    vaultGeneration: revision?.vaultGeneration ?? baseline.vaultGeneration,
+    body: next.note,
+    explicitTags: next.tags,
+    operations: [
+      { dataset: NOTES_DATASET, operation: 'update', key: { id }, values: row },
+      ...deletes.filter((operation) => operation.dataset !== TAGS_DATASET),
+      ...relationWrites(next).filter((operation) => operation.dataset !== TAGS_DATASET)
+    ]
+  }))
+}
 
 export async function updateNote(id: string, record: SideNoteRecord, expectedUpdatedAt?: string, documentRevision?: DocumentRevision, session = captureNoteMutation()): Promise<boolean> {
   const revision = documentRevision ? { ...documentRevision } : undefined
   const next = await withFileKey({ ...copyNote(record), id }, session)
   try {
-    session.assertActive()
-    const ref = { pluginId: session.api.pluginId, sourceId: 'notes', itemId: id }
-    const baseline = await session.api.documents.read(ref)
-    session.assertActive()
-    if (!baseline) return false
-    if (expectedUpdatedAt !== undefined) {
-      const current = await session.api.data.dataset(NOTES_DATASET).get({ id })
-      session.assertActive()
-      if (current?.updatedAt !== expectedUpdatedAt) return false
-    }
-    const row = noteRow(next)
-    delete row.id
-    delete row.note
-    const deletes = await relationDeletes(session, id)
-    session.assertActive()
-    await session.api.documents.update(ref, {
-      expectedRevision: revision?.expectedRevision ?? baseline.revision,
-      vaultGeneration: revision?.vaultGeneration ?? baseline.vaultGeneration,
-      body: next.note,
-      explicitTags: next.tags,
-      operations: [
-        { dataset: NOTES_DATASET, operation: 'update', key: { id }, values: row },
-        ...deletes.filter((operation) => operation.dataset !== TAGS_DATASET),
-        ...relationWrites(next).filter((operation) => operation.dataset !== TAGS_DATASET)
-      ]
-    })
+    await writeNoteUpdate(id, next, expectedUpdatedAt, revision, session)
     return true
   } catch {
     return false
   }
 }
 
+/** Like updateNote, but rejects with a coded outcome ('not-applied' or 'unknown') instead of returning false. */
+export async function updateNoteOrThrow(id: string, record: SideNoteRecord, expectedUpdatedAt?: string, documentRevision?: DocumentRevision, session = captureNoteMutation()): Promise<void> {
+  const revision = documentRevision ? { ...documentRevision } : undefined
+  const next = await beforeEffect(() => withFileKey({ ...copyNote(record), id }, session))
+  await writeNoteUpdate(id, next, expectedUpdatedAt, revision, session)
+}
+
+async function removeNote(id: string, session: NoteMutationSession): Promise<void> {
+  await beforeEffect(async () => session.assertActive())
+  const { affected } = await dispatchWrite(() => session.api.data.dataset(NOTES_DATASET).delete({ id }))
+  if (affected <= 0) throw refusal('TARGET_NOT_FOUND', 'The SideNote no longer exists.')
+}
+
 export async function deleteNote(id: string, session = captureNoteMutation()): Promise<boolean> {
   try {
-    session.assertActive()
-    return (await session.api.data.dataset(NOTES_DATASET).delete({ id })).affected > 0
+    await removeNote(id, session)
+    return true
   } catch {
     return false
   }
+}
+
+/** Like deleteNote, but rejects with a coded outcome ('not-applied' or 'unknown') instead of returning false. */
+export async function deleteNoteOrThrow(id: string, session = captureNoteMutation()): Promise<void> {
+  await removeNote(id, session)
 }
 
 /** Retarget notes after an in-app rename/move (mirrors core retargetSideNotePaths). */

@@ -1,3 +1,4 @@
+import Ajv from 'ajv'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_SURFACE_V1, SEARCH_RESULT_ACTION_V1, TEXT_SELECTION_ACTION_V1, type DatasetRecord } from '@valley/plugin-sdk'
 import { act, renderHook, waitFor } from '@testing-library/react'
@@ -1049,6 +1050,54 @@ describe('sideNotes styles — anchor pill', () => {
 })
 
 describe('SideNotes explicit automation', () => {
+  it('validates all public results and observes exact relational restoration', async () => {
+    const mock = createMockValleyApi({ manifest: { id: 'sideNotes', noteDocuments: config.noteDocuments, datasets: config.datasets as unknown as ValleyPluginManifest['datasets'] }, files: { 'Notes/A.md': 'Canopy' } })
+    const registrations = vi.spyOn(mock.api.commands, 'register')
+    const dispose = register(mock.api)
+    const seen = new Set<string>()
+    try {
+      const commands = registrations.mock.calls.map(([value]) => value as typeof value & { outputSchema: Record<string, unknown> })
+      expect(commands).toHaveLength(7)
+      const ajv = new Ajv({ strict: false, strictSchema: true, allErrors: true })
+      const call = async (id: string, input?: unknown) => {
+        const result = await mock.api.commands.execute(`sideNotes:${id}`, input)
+        expect(result.ok, id).toBe(true)
+        if (!result.ok) throw new Error(JSON.stringify(result))
+        const validate = ajv.compile(commands.find(command => command.id === id)!.outputSchema)
+        expect(validate(result.value), `${id}: ${JSON.stringify(validate.errors)}`).toBe(true)
+        expect(validate({ unexpected: true }), id).toBe(false)
+        seen.add(id)
+        return result.value as SideNoteRecord
+      }
+      await call('highlight-selection')
+      const created = await call('create', { path: 'Notes/A.md', note: 'Frühstück', tags: ['forest'], anchor: { type: 'none' } })
+      expect(mock.datasets.get('sideNotes.notes')).toContainEqual(expect.objectContaining({ id: created.id, note: 'Frühstück' }))
+      await call('get', { id: created.id })
+      await call('list', { flagged: false })
+      await call('open', { id: created.id })
+      expect(mock.api.workspace.openFile).toHaveBeenCalledWith('Notes/A.md', { type: 'none' })
+      const before = structuredClone(mock.datasets.get('sideNotes.notes'))
+      const beforeTags = structuredClone(mock.datasets.get('sideNotes.note_tags'))
+      await call('update', { id: created.id, values: { note: 'Wald', tags: [], flagged: false }, expectedUpdatedAt: created.updatedAt })
+      expect(mock.datasets.get('sideNotes.notes')).toContainEqual(expect.objectContaining({ id: created.id, note: 'Wald', flagged: false }))
+      await mock.busUndo.at(-1)!.undo()
+      const withoutRevision = (rows: typeof before) => rows?.map(({ updatedAt: _updatedAt, ...row }) => row)
+      expect(withoutRevision(mock.datasets.get('sideNotes.notes'))).toEqual(withoutRevision(before))
+      expect(mock.datasets.get('sideNotes.note_tags')).toEqual(beforeTags)
+      await call('delete', { id: created.id })
+      expect(await loadNotes()).toEqual([])
+      await mock.busUndo.at(-1)!.undo()
+      expect(await loadNotes()).toEqual([expect.objectContaining({ ...created, updatedAt: expect.any(String) })])
+      await call('update', { id: created.id, values: { note: 'Guarded restoration' } })
+      const undo = mock.busUndo.at(-1)!
+      const current = (await loadNotes())[0]
+      await saveNoteValues(created.id, { note: 'Newer observation' }, current.updatedAt)
+      await expect(undo.undo()).rejects.toThrow('Newer work was preserved')
+      expect((await loadNotes())[0].note).toBe('Newer observation')
+      expect([...seen].sort()).toEqual(commands.map(command => command.id).sort())
+    } finally { dispose() }
+  })
+
   it('edits a selected annotation and rejects stale or unsupported values', async () => {
     const mock = createMockValleyApi({ manifest: { id: 'sideNotes', noteDocuments: config.noteDocuments }, datasets: { 'sideNotes.notes': [seed()] } })
     initRuntime(mock.api)
@@ -1060,6 +1109,82 @@ describe('SideNotes explicit automation', () => {
     expect(saved.ok).toBe(true)
     expect((await loadNotes())[0]).toMatchObject({ note: 'Checked derivation', flagged: true, tags: ['review'], path: 'Notes/A.md' })
     expect(mock.busUndo).toHaveLength(1)
+  })
+
+  it('settles pre-effect refusals as coded not-applied failures and post-commit read loss as unknown', async () => {
+    const mock = createMockValleyApi({ manifest: { id: 'sideNotes', noteDocuments: config.noteDocuments }, files: { 'Notes/A.md': 'Text' }, datasets: { 'sideNotes.notes': [seed()] } })
+    initRuntime(mock.api)
+    const registrations = vi.spyOn(mock.api.commands, 'register')
+    registerSideNoteCommands(mock.api)
+    const run = (id: string, input: unknown) => {
+      const command = registrations.mock.calls.map(([value]) => value).find((value) => value.id === id)!
+      return Promise.resolve().then(() => command.run(command.input!.parse(input) as never, { caller: 'agent', dryRun: false } as never))
+    }
+    const refused = (code: string) => ({ code, outcome: 'not-applied', retryable: false })
+    const before = structuredClone(mock.datasets.get('sideNotes.notes'))
+    await expect(run('update', { id: 'sidenote_test', values: { note: 'Stale' }, expectedUpdatedAt: 'older' })).rejects.toMatchObject(refused('REVISION_CONFLICT'))
+    await expect(run('update', { id: 'missing', values: { note: 'Missing' } })).rejects.toMatchObject(refused('TARGET_NOT_FOUND'))
+    await expect(run('update', { id: 'sidenote_test', values: { anchor: { type: 'media-time', seconds: 3 } } })).rejects.toMatchObject(refused('INVALID_INPUT'))
+    await expect(run('delete', { id: 'missing' })).rejects.toMatchObject(refused('TARGET_NOT_FOUND'))
+    await expect(run('open', { id: 'missing' })).rejects.toMatchObject(refused('TARGET_NOT_FOUND'))
+    await expect(run('create', { path: 'Notes/Gone.md', note: 'Text' })).rejects.toMatchObject(refused('TARGET_NOT_FOUND'))
+    await expect(run('create', { path: 'Notes/A.md', note: 'Text', anchor: { type: 'media-time', seconds: 20 } })).rejects.toMatchObject(refused('INVALID_INPUT'))
+    expect(mock.datasets.get('sideNotes.notes')).toEqual(before)
+    expect(mock.api.workspace.openFile).not.toHaveBeenCalled()
+    const update = mock.api.documents.update.bind(mock.api.documents)
+    vi.spyOn(mock.api.documents, 'update').mockImplementationOnce(async (...args) => {
+      const result = await update(...args)
+      await mock.api.data.dataset('sideNotes.notes').delete({ id: 'sidenote_test' })
+      return result
+    })
+    const lost = await run('update', { id: 'sidenote_test', values: { note: 'Committed' } }).catch((error: unknown) => error)
+    expect(lost).toMatchObject({ code: 'TARGET_NOT_FOUND', outcome: 'unknown', retryable: false })
+  })
+
+  it('settles stale or missing targets found inside the write phase as not-applied and keeps host uncertainty', async () => {
+    const mock = createMockValleyApi({ manifest: { id: 'sideNotes', noteDocuments: config.noteDocuments }, files: { 'Notes/A.md': 'Text' }, datasets: { 'sideNotes.notes': [seed()] } })
+    initRuntime(mock.api)
+    const registrations = vi.spyOn(mock.api.commands, 'register')
+    registerSideNoteCommands(mock.api)
+    const run = (id: string, input: unknown) => {
+      const command = registrations.mock.calls.map(([value]) => value).find((value) => value.id === id)!
+      return Promise.resolve().then(() => command.run(command.input!.parse(input) as never, { caller: 'agent', dryRun: false } as never))
+    }
+    const notes = mock.api.data.dataset('sideNotes.notes')
+    const stat = mock.api.vault.stat.bind(mock.api.vault)
+    const concurrently = (change: () => Promise<unknown>) => vi.spyOn(mock.api.vault, 'stat').mockImplementationOnce(async (path) => { await change(); return stat(path) })
+    const refused = (code: string) => ({ code, outcome: 'not-applied', retryable: false })
+
+    concurrently(() => notes.update({ id: 'sidenote_test' }, { updatedAt: '2026-01-02T00:00:00.000Z' }))
+    await expect(run('update', { id: 'sidenote_test', values: { note: 'Raced' } })).rejects.toMatchObject(refused('REVISION_CONFLICT'))
+    const changed = structuredClone(mock.datasets.get('sideNotes.notes'))
+    expect(changed).toMatchObject([{ note: 'Check this derivation', updatedAt: '2026-01-02T00:00:00.000Z' }])
+
+    vi.spyOn(mock.api.documents, 'update').mockRejectedValueOnce(Object.assign(new Error('The item changed elsewhere'), { code: 'conflict' }))
+    await expect(run('update', { id: 'sidenote_test', values: { note: 'Stale revision' } })).rejects.toMatchObject(refused('REVISION_CONFLICT'))
+    vi.spyOn(mock.api.documents, 'update').mockRejectedValueOnce(Object.assign(new Error('Store lost the reply'), { code: 'store-unavailable', outcomeUnknown: true }))
+    await expect(run('update', { id: 'sidenote_test', values: { note: 'Maybe' } })).rejects.toMatchObject({ code: 'store-unavailable', outcome: 'unknown', retryable: false })
+    vi.spyOn(mock.api.documents, 'update').mockRejectedValueOnce(new Error('Transport closed'))
+    const transport = await run('update', { id: 'sidenote_test', values: { note: 'Maybe' } }).catch((error: unknown) => error)
+    expect(transport).toBeInstanceOf(Error)
+    expect((transport as { outcome?: unknown }).outcome).toBeUndefined()
+    expect(mock.datasets.get('sideNotes.notes')).toEqual(changed)
+
+    const dataset = mock.api.data.dataset.bind(mock.api.data)
+    const handles = vi.spyOn(mock.api.data, 'dataset').mockImplementation((id) => {
+      const handle = dataset(id)
+      return id === 'sideNotes.notes' ? { ...handle, delete: async () => ({ affected: 0, revision: 0 }) } as unknown as typeof handle : handle
+    })
+    await expect(run('delete', { id: 'sidenote_test' })).rejects.toMatchObject(refused('TARGET_NOT_FOUND'))
+    handles.mockRestore()
+
+    concurrently(() => notes.delete({ id: 'sidenote_test' }))
+    await expect(run('update', { id: 'sidenote_test', values: { note: 'Gone' } })).rejects.toMatchObject(refused('TARGET_NOT_FOUND'))
+    expect(mock.datasets.get('sideNotes.notes')).toEqual([])
+
+    vi.spyOn(mock.api.data, 'transaction').mockRejectedValueOnce(Object.assign(new Error('Validation failed'), { code: 'validation-failed' }))
+    await expect(run('create', { path: 'Notes/A.md', note: 'Text' })).rejects.toMatchObject(refused('validation-failed'))
+    expect(mock.datasets.get('sideNotes.notes')).toEqual([])
   })
 
   it('refuses creation without text or with an anchor that does not fit its subject', async () => {

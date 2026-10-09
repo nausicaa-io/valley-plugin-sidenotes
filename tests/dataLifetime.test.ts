@@ -323,3 +323,69 @@ describe('SideNotes registered command lifetime', () => {
     expect(sideNoteEditStore().get()).toBeNull()
   })
 })
+
+describe('SideNotes create/delete undo and open refusals', () => {
+  const conflict = { code: 'REVISION_CONFLICT', outcome: 'not-applied' }
+
+  async function created(mock: MockValleyApi) {
+    registerSideNoteCommands(mock.api)
+    vi.spyOn(mock.api.vault, 'fileInfo').mockResolvedValue({ relPath: 'A.md' } as never)
+    return command(mock, 'create').run({ path: 'A.md', note: 'Created' })
+  }
+
+  it('refuses a create undo after a later edit and keeps the edited note', async () => {
+    const mock = runtime()
+    const result = await created(mock)
+    await command(mock, 'update').run({ id: result.value.id, values: { note: 'Edited later' } })
+    await expect(result.revert.run()).rejects.toMatchObject(conflict)
+    expect(mock.datasets.get('sideNotes.notes')!.map((row) => row.note)).toEqual(['Edited later'])
+  })
+
+  it('reports a failed create undo and a failed create redo instead of success', async () => {
+    const mock = runtime()
+    const result = await created(mock)
+    await command(mock, 'delete').run({ id: result.value.id })
+    await expect(result.revert.run()).rejects.toMatchObject({ code: 'TARGET_NOT_FOUND', outcome: 'not-applied' })
+    const fresh = await created(mock)
+    await fresh.revert.run()
+    expect(mock.datasets.get('sideNotes.notes')).toHaveLength(0)
+    vi.spyOn(mock.api.data, 'transaction').mockRejectedValueOnce(Object.assign(new Error('insert refused'), { code: 'conflict' }))
+    await expect(fresh.revert.reapply()).rejects.toMatchObject(conflict)
+    await fresh.revert.reapply()
+    expect(mock.datasets.get('sideNotes.notes')!.map((row) => row.note)).toEqual(['Created'])
+    await fresh.revert.run()
+    expect(mock.datasets.get('sideNotes.notes')).toHaveLength(0)
+  })
+
+  it('reports a failed delete undo and refuses a delete redo over newer work', async () => {
+    const mock = runtime()
+    const note = await seeded(mock)
+    registerSideNoteCommands(mock.api)
+    const deleted = await command(mock, 'delete').run({ id: note.id })
+    vi.spyOn(mock.api.data, 'transaction').mockRejectedValueOnce(Object.assign(new Error('insert refused'), { code: 'conflict' }))
+    await expect(deleted.revert.run()).rejects.toMatchObject(conflict)
+    expect(mock.datasets.get('sideNotes.notes')).toHaveLength(0)
+    await deleted.revert.run()
+    expect(mock.datasets.get('sideNotes.notes')!.map((row) => row.note)).toEqual(['Original body'])
+    await command(mock, 'update').run({ id: note.id, values: { note: 'Edited after undo' } })
+    await expect(deleted.revert.reapply()).rejects.toMatchObject(conflict)
+    expect(mock.datasets.get('sideNotes.notes')!.map((row) => row.note)).toEqual(['Edited after undo'])
+  })
+
+  it('reports a failed delete redo when the restored note is already gone', async () => {
+    const mock = runtime()
+    const note = await seeded(mock)
+    registerSideNoteCommands(mock.api)
+    const deleted = await command(mock, 'delete').run({ id: note.id })
+    await deleted.revert.run()
+    await deleted.revert.reapply()
+    expect(mock.datasets.get('sideNotes.notes')).toHaveLength(0)
+    await expect(deleted.revert.reapply()).rejects.toMatchObject({ outcome: 'not-applied' })
+  })
+
+  it.each(['failed', 'unavailable'] as const)('refuses an open whose web destination is %s as not applied', async (status) => {
+    const mock = runtime()
+    vi.mocked(mock.api.links.open).mockResolvedValue({ status, message: 'No browser' })
+    await expect(openSideNoteSubject(mock.api, makeWebNote('https://example.com/', 'Web', { type: 'none' }))).rejects.toMatchObject({ code: 'TARGET_UNAVAILABLE', outcome: 'not-applied', message: 'No browser' })
+  })
+})
