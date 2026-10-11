@@ -106,12 +106,39 @@ export function selectSideNote(note: SideNoteRecord | null, surface: SlotId): vo
 
 export function useSideNoteSubject(path: string, url: string): void {
   React.useEffect(() => {
-    const previous = view('right_sidebar')
+    const owner = state()
+    const previous = view('right_sidebar', owner)
     if (previous.path === path && previous.url === url) return
-    state().views.set('right_sidebar', { ...previous, path, url })
-    const selected = state().selected.get('right_sidebar')
-    if (selected && (selected.path !== path || (selected.url ?? '') !== url)) state().selected.delete('right_sidebar')
-    notify()
+    const entry = owner.views.get('right_sidebar')
+    const subject = { ...previous, path, url }
+    owner.views.set('right_sidebar', subject)
+    const selected = owner.selected.get('right_sidebar')
+    const dropped = selected && (selected.path !== path || (selected.url ?? '') !== url) ? selected : undefined
+    if (dropped) owner.selected.delete('right_sidebar')
+    notify(owner)
+    // The inverse when the Panel unmounts or re-subjects: give back the subject (and the selection it dropped) this effect
+    // replaced, unless something re-subjected the surface since; view fields edited meanwhile are kept.
+    return () => {
+      const current = owner.views.get('right_sidebar')
+      if (!current || current.path !== path || current.url !== url) return
+      if (current === subject && !entry) owner.views.delete('right_sidebar')
+      else if (current === subject) owner.views.set('right_sidebar', entry!)
+      else {
+        const restored = { ...current }
+        delete restored.path
+        delete restored.url
+        if (entry && 'path' in entry) restored.path = entry.path
+        if (entry && 'url' in entry) restored.url = entry.url
+        owner.views.set('right_sidebar', restored)
+      }
+      const back = view('right_sidebar', owner)
+      const selection = owner.selected.get('right_sidebar')
+      if (!selection || selection.path !== back.path || (selection.url ?? '') !== back.url) {
+        if (dropped) owner.selected.set('right_sidebar', dropped)
+        else owner.selected.delete('right_sidebar')
+      }
+      notify(owner)
+    }
   }, [path, url])
 }
 

@@ -36,7 +36,7 @@ import { matchesSearch } from '../src/search'
 import { openSideNoteSubject, registerSideNoteCommands, saveNoteValues } from '../src/commands'
 import { registerSearchCard } from '../src/searchCard'
 import { register } from '../src/index'
-import { registerSideNoteSurfaces, selectSideNote, useSideNoteViewField } from '../src/surfaces'
+import { registerSideNoteSurfaces, selectSideNote, useSideNoteSubject, useSideNoteViewField } from '../src/surfaces'
 import config from '../config.json'
 import { useNotes } from '../src/hooks'
 import type { NoteScope } from '../src/noteRepository'
@@ -570,6 +570,43 @@ describe('SideNotes scoped repository', () => {
     await act(async () => {})
     const provider = mock.api.interop.extensions.providers(PLUGIN_SURFACE_V1).find((entry) => entry.extension.surface === 'right_sidebar')!
     expect(provider.extension.getSnapshot().item?.title).toBe('New selection')
+    dispose()
+  })
+
+  it('gives back the right_sidebar subject and the selection a mounted Panel replaced, keeping later view edits and newer subjects', async () => {
+    const mock = fixture([seed(), seed({ id: 'other', path: 'Notes/B.md', note: 'Other subject' })])
+    const dispose = registerSideNoteSurfaces(mock.api)
+    const owner = mock.api.runtime.getOrCreate('sideNotes.surfaces', () => { throw new Error('unexpected') }) as { views: Map<string, Record<string, unknown>>, selected: Map<string, SideNoteRecord> }
+    const provider = mock.api.interop.extensions.providers(PLUGIN_SURFACE_V1).find((entry) => entry.extension.surface === 'right_sidebar')!
+    const other = (await loadNotes()).find((note) => note.id === 'other')!
+    const absent = provider.extension.getSnapshot()
+    const panel = renderHook(({ path }) => useSideNoteSubject(path, ''), { initialProps: { path: 'Notes/A.md' } })
+    expect(owner.views.get('right_sidebar')).toMatchObject({ path: 'Notes/A.md', url: '' })
+    panel.unmount()
+    expect(owner.views.has('right_sidebar')).toBe(false)
+    expect(provider.extension.getSnapshot()).toEqual(absent)
+
+    const prior = { v: 1, search: '', filterWarning: false, sortField: 'position', sortDir: 'asc', aware: false, path: 'Notes/B.md', url: '' }
+    act(() => { owner.views.set('right_sidebar', prior); selectSideNote(other, 'right_sidebar') })
+    const before = provider.extension.getSnapshot()
+    const search = renderHook(() => useSideNoteViewField<string>('right_sidebar', 'search', ''))
+    const mounted = renderHook(({ path }) => useSideNoteSubject(path, ''), { initialProps: { path: 'Notes/A.md' } })
+    expect(owner.selected.has('right_sidebar')).toBe(false)
+    act(() => search.result.current[1]('fern'))
+    mounted.rerender({ path: 'Notes/C.md' })
+    expect(owner.views.get('right_sidebar')).toMatchObject({ path: 'Notes/C.md', search: 'fern' })
+    mounted.unmount()
+    expect(owner.views.get('right_sidebar')).toEqual({ ...prior, search: 'fern' })
+    expect(owner.selected.get('right_sidebar')).toBe(other)
+    act(() => search.result.current[1](''))
+    expect(provider.extension.getSnapshot()).toEqual(before)
+
+    const replaced = renderHook(() => useSideNoteSubject('Notes/A.md', ''))
+    act(() => { owner.views.set('right_sidebar', { ...prior, path: 'Notes/D.md' }) })
+    replaced.unmount()
+    expect(owner.views.get('right_sidebar')).toEqual({ ...prior, path: 'Notes/D.md' })
+    expect(owner.selected.has('right_sidebar')).toBe(false)
+    search.unmount()
     dispose()
   })
 
