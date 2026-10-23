@@ -1233,3 +1233,36 @@ describe('SideNotes explicit automation', () => {
     expect(await loadNotes()).toHaveLength(0)
   })
 })
+
+describe('SideNotes new-tab intent', () => {
+  it('declares the optional newTab input on sideNotes:open and opens the annotated file or page in a new tab only when asked', async () => {
+    const mock = createMockValleyApi({ manifest: { id: 'sideNotes', noteDocuments: config.noteDocuments, datasets: config.datasets as unknown as ValleyPluginManifest['datasets'] }, files: { 'Notes/A.md': 'Canopy' } })
+    const registrations = vi.spyOn(mock.api.commands, 'register')
+    const dispose = register(mock.api)
+    try {
+      const open = registrations.mock.calls.map(([value]) => value).find(command => command.id === 'open')
+      expect((open?.input?.schema as { properties?: Record<string, unknown> } | undefined)?.properties?.newTab).toEqual({ type: 'boolean' })
+      const file = await mock.api.commands.execute('sideNotes:create', { path: 'Notes/A.md', note: 'Canopy', anchor: { type: 'none' } })
+      const page = await mock.api.commands.execute('sideNotes:create', { url: 'https://ferns.test/canopy', note: 'Fronds' })
+      if (!file.ok || !page.ok) throw new Error('Could not create the fixture annotations.')
+      const fileId = (file.value as SideNoteRecord).id
+      const pageId = (page.value as SideNoteRecord).id
+      const openFile = vi.mocked(mock.api.workspace.openFile)
+      const openLink = vi.mocked(mock.api.links.open).mockResolvedValue({ status: 'opened' } as Awaited<ReturnType<typeof mock.api.links.open>>)
+      expect((await mock.api.commands.execute('sideNotes:open', { id: fileId, newTab: true })).ok).toBe(true)
+      expect(openFile.mock.calls.at(-1)).toEqual(['Notes/A.md', { type: 'none' }, { newTab: true }])
+      expect((await mock.api.commands.execute('sideNotes:open', { id: fileId })).ok).toBe(true)
+      expect((await mock.api.commands.execute('sideNotes:open', { id: fileId, newTab: false })).ok).toBe(true)
+      expect(openFile.mock.calls.slice(-2)).toEqual([['Notes/A.md', { type: 'none' }], ['Notes/A.md', { type: 'none' }]])
+      expect((await mock.api.commands.execute('sideNotes:open', { id: pageId, newTab: true })).ok).toBe(true)
+      expect(openLink.mock.calls.at(-1)).toEqual(['https://ferns.test/canopy', { newTab: true }])
+      expect((await mock.api.commands.execute('sideNotes:open', { id: pageId })).ok).toBe(true)
+      expect(openLink.mock.calls.at(-1)).toEqual(['https://ferns.test/canopy'])
+      const calls = openFile.mock.calls.length + openLink.mock.calls.length
+      expect((await mock.api.commands.execute('sideNotes:open', { id: fileId, newTab: 'yes' })).ok).toBe(false)
+      expect(openFile.mock.calls.length + openLink.mock.calls.length).toBe(calls)
+    } finally {
+      dispose()
+    }
+  })
+})

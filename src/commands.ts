@@ -154,19 +154,21 @@ export async function saveNoteValues(id: string, values: ReturnType<typeof parse
   return { value: copyNote(committed), revert: { label: 'Edit SideNote', run: () => restore(previous), reapply: () => restore(next) } }
 }
 
-export async function openSideNoteSubject(api: ValleyPluginApi, note: Pick<SideNoteRecord, 'path' | 'url' | 'anchor'>, assertActive?: () => void): Promise<void> {
+export async function openSideNoteSubject(api: ValleyPluginApi, note: Pick<SideNoteRecord, 'path' | 'url' | 'anchor'>, assertActive?: () => void, newTab = false): Promise<void> {
   const session = captureNoteMutation(api, assertActive)
   session.assertActive()
   const subject = { path: note.path, url: note.url, anchor: { ...note.anchor } }
   if (subject.url) {
-    const result = await api.links.open(subject.url)
+    const result = await (newTab ? api.links.open(subject.url, { newTab: true }) : api.links.open(subject.url))
     session.assertActive()
     if (result.status === 'failed' || result.status === 'unavailable') refused('TARGET_UNAVAILABLE', result.message ?? 'Destination unavailable')
   } else {
     const file = await api.vault.fileInfo(subject.path)
     session.assertActive()
     if (!file) refused('TARGET_NOT_FOUND', 'The annotation file no longer exists.')
-    api.workspace.openFile(subject.path, subject.anchor.type === 'web-selection' ? undefined : subject.anchor)
+    const anchor = subject.anchor.type === 'web-selection' ? undefined : subject.anchor
+    if (newTab) api.workspace.openFile(subject.path, anchor, { newTab: true })
+    else api.workspace.openFile(subject.path, anchor)
   }
 }
 
@@ -183,6 +185,12 @@ export function registerSideNoteCommands(api: ValleyPluginApi): () => void {
     return value
   }
   const idInput = { schema: object({ id: text }, ['id']), parse: (raw: unknown) => ({ id: requiredText(record(raw).id, 'SideNote id') }), fromCli: (args: string[]) => ({ id: args[0] }) }
+  const openInput = { schema: object({ id: text, newTab: { type: 'boolean' } }, ['id']), parse: (raw: unknown) => {
+    const input = record(raw)
+    const id = requiredText(input.id, 'SideNote id')
+    if (input.newTab !== undefined && typeof input.newTab !== 'boolean') throw new Error('Expected newTab to be a boolean.')
+    return input.newTab === true ? { id, newTab: true } : { id }
+  }, fromCli: idInput.fromCli }
   const register = <I, O, E extends 'read' | 'write' | 'execute'>(command: PluginCommand<I, O, E>): (() => void) => {
     const registration: PluginCommand<I, O, E> & { outputSchema: Record<string, unknown> } = { ...command, outputSchema: command.id === 'list' ? { type: 'array', items: noteResultSchema, maxItems: 10000 } : noteResultSchema }
     return api.commands.register(registration)
@@ -204,9 +212,9 @@ export function registerSideNoteCommands(api: ValleyPluginApi): () => void {
       return notes.filter((note) => (!accepted.path || note.path === accepted.path) && (!accepted.url || note.url === normalizeUrl(accepted.url)) && (accepted.flagged === undefined || !!note.flagged === accepted.flagged) && (!accepted.query || `${note.note} ${note.tags.join(' ')}`.toLowerCase().includes(accepted.query.toLowerCase())))
     } }),
     register({ id: 'get', label: 'SideNotes: Get annotation', labelKey: 'sideNotes.command.get', paletteSafe: false, sideEffect: 'read', input: idInput, run: ({ id }) => requireSideNote(id, session) }),
-    register({ id: 'open', label: 'SideNotes: Open annotation', labelKey: 'sideNotes.command.open', paletteSafe: false, sideEffect: 'execute', input: idInput, run: async ({ id }) => {
+    register({ id: 'open', label: 'SideNotes: Open annotation', labelKey: 'sideNotes.command.open', paletteSafe: false, sideEffect: 'execute', input: openInput, run: async ({ id, newTab }) => {
       const note = await requireSideNote(id, session)
-      await openSideNoteSubject(api, note, session.assertActive)
+      await openSideNoteSubject(api, note, session.assertActive, newTab)
       session.assertActive()
       await api.workspace.revealOwnPanel('right_sidebar')
       session.assertActive()
