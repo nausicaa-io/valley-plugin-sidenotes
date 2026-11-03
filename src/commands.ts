@@ -24,6 +24,10 @@ function refused(code: string, message: string): never {
   throw Object.assign(new Error(message), { code, outcome: 'not-applied' as const, retryable: false })
 }
 
+function invalidInput(message: string): Error {
+  return Object.assign(new Error(message), { code: 'INVALID_INPUT', outcome: 'not-applied' as const, retryable: false })
+}
+
 async function committedSideNote(id: string, session: NoteMutationSession): Promise<SideNoteRecord> {
   try { return await requireSideNote(id, session) } catch (error) {
     throw Object.assign(error instanceof Error ? error : new Error(String(error)), { outcome: 'unknown' as const, retryable: false })
@@ -31,12 +35,12 @@ async function committedSideNote(id: string, session: NoteMutationSession): Prom
 }
 
 function record(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Expected an object.')
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalidInput('Expected an object.')
   return value as Record<string, unknown>
 }
 
 function requiredText(value: unknown, label: string): string {
-  if (typeof value !== 'string' || !value.trim()) throw new Error(`Expected ${label}.`)
+  if (typeof value !== 'string' || !value.trim()) throw invalidInput(`Expected ${label}.`)
   return value.trim()
 }
 
@@ -44,7 +48,7 @@ function parseAnchor(value: unknown): SideNoteAnchor {
   const input = record(value)
   const positive = (key: string): number => {
     const number = input[key]
-    if (typeof number !== 'number' || !Number.isInteger(number) || number < 1) throw new Error(`Invalid anchor ${key}.`)
+    if (typeof number !== 'number' || !Number.isInteger(number) || number < 1) throw invalidInput(`Invalid anchor ${key}.`)
     return number
   }
   const optionalSnippet = typeof input.snippet === 'string' ? { snippet: input.snippet } : {}
@@ -52,28 +56,28 @@ function parseAnchor(value: unknown): SideNoteAnchor {
     case 'none': return { type: 'none' }
     case 'pdf-page': return { type: 'pdf-page', page: positive('page'), ...optionalSnippet }
     case 'media-time': {
-      if (typeof input.seconds !== 'number' || !Number.isFinite(input.seconds) || input.seconds < 0) throw new Error('Invalid anchor time.')
+      if (typeof input.seconds !== 'number' || !Number.isFinite(input.seconds) || input.seconds < 0) throw invalidInput('Invalid anchor time.')
       return { type: 'media-time', seconds: input.seconds }
     }
     case 'markdown-line': return { type: 'markdown-line', line: positive('line'), ...optionalSnippet }
     case 'markdown-heading': return { type: 'markdown-heading', heading: requiredText(input.heading, 'heading'), ...(input.line === undefined ? {} : { line: positive('line') }) }
     case 'markdown-snippet': return { type: 'markdown-snippet', snippet: requiredText(input.snippet, 'snippet'), ...(input.line === undefined ? {} : { line: positive('line') }) }
     case 'web-selection': return { type: 'web-selection', snippet: requiredText(input.snippet, 'snippet') }
-    default: throw new Error('Unsupported editable anchor.')
+    default: throw invalidInput('Unsupported editable anchor.')
   }
 }
 
 export function parseNoteValues(raw: unknown): Partial<Pick<SideNoteRecord, 'note' | 'tags' | 'flagged' | 'anchor'>> {
   const input = record(raw)
-  if (Object.keys(input).some((key) => !['note', 'tags', 'flagged', 'anchor'].includes(key))) throw new Error('Unsupported SideNote property.')
+  if (Object.keys(input).some((key) => !['note', 'tags', 'flagged', 'anchor'].includes(key))) throw invalidInput('Unsupported SideNote property.')
   const result: Partial<Pick<SideNoteRecord, 'note' | 'tags' | 'flagged' | 'anchor'>> = {}
   if (input.note !== undefined) result.note = requiredText(input.note, 'note text')
   if (input.tags !== undefined) {
-    if (!Array.isArray(input.tags) || !input.tags.every((tag) => typeof tag === 'string')) throw new Error('Expected a list of tags.')
+    if (!Array.isArray(input.tags) || !input.tags.every((tag) => typeof tag === 'string')) throw invalidInput('Expected a list of tags.')
     result.tags = [...new Set(input.tags.map((tag: string) => tag.trim().replace(/^#+/, '')).filter(Boolean))]
   }
   if (input.flagged !== undefined) {
-    if (typeof input.flagged !== 'boolean') throw new Error('Expected a boolean flag.')
+    if (typeof input.flagged !== 'boolean') throw invalidInput('Expected a boolean flag.')
     result.flagged = input.flagged
   }
   if (input.anchor !== undefined) result.anchor = parseAnchor(input.anchor)
@@ -186,7 +190,7 @@ export function registerSideNoteCommands(api: ValleyPluginApi): () => void {
   const openInput = { schema: object({ id: text, newTab: { type: 'boolean' } }, ['id']), parse: (raw: unknown) => {
     const input = record(raw)
     const id = requiredText(input.id, 'SideNote id')
-    if (input.newTab !== undefined && typeof input.newTab !== 'boolean') throw new Error('Expected newTab to be a boolean.')
+    if (input.newTab !== undefined && typeof input.newTab !== 'boolean') throw invalidInput('Expected newTab to be a boolean.')
     return input.newTab === true ? { id, newTab: true } : { id }
   }, fromCli: idInput.fromCli }
   const register = <I, O, E extends 'read' | 'write' | 'execute'>(command: PluginCommand<I, O, E>): (() => void) => {
@@ -198,8 +202,8 @@ export function registerSideNoteCommands(api: ValleyPluginApi): () => void {
       schema: object({ path: text, url: text, query: text, flagged: { type: 'boolean' } }),
       parse: (raw) => {
         const input = raw == null ? {} : record(raw)
-        for (const key of ['path', 'url', 'query']) if (input[key] !== undefined && typeof input[key] !== 'string') throw new Error(`Expected ${key} text.`)
-        if (input.flagged !== undefined && typeof input.flagged !== 'boolean') throw new Error('Expected a boolean flag.')
+        for (const key of ['path', 'url', 'query']) if (input[key] !== undefined && typeof input[key] !== 'string') throw invalidInput(`Expected ${key} text.`)
+        if (input.flagged !== undefined && typeof input.flagged !== 'boolean') throw invalidInput('Expected a boolean flag.')
         return { path: input.path as string | undefined, url: input.url as string | undefined, query: input.query as string | undefined, flagged: input.flagged as boolean | undefined }
       }
     }, run: async (input) => {
@@ -230,8 +234,8 @@ export function registerSideNoteCommands(api: ValleyPluginApi): () => void {
         const input = record(raw)
         const path = typeof input.path === 'string' ? input.path.trim() : ''
         const url = typeof input.url === 'string' ? input.url.trim() : ''
-        if (!!path === !!url) throw new Error('Provide exactly one file path or URL.')
-        if (url && !/^https?:\/\//i.test(url)) throw new Error('Expected an HTTP or HTTPS URL.')
+        if (!!path === !!url) throw invalidInput('Provide exactly one file path or URL.')
+        if (url && !/^https?:\/\//i.test(url)) throw invalidInput('Expected an HTTP or HTTPS URL.')
         return { path, url, ...parseNoteValues({ note: requiredText(input.note, 'note text'), tags: input.tags, anchor: input.anchor }) }
       }
     },
