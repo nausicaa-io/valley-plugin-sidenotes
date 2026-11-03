@@ -34,11 +34,14 @@ function noteSourceType(note: SideNoteRecord): string {
 }
 
 /** Open a note's subject (web page via the command bus, file in the workspace). */
-function openNote(note: SideNoteRecord): void {
+function openNote(note: SideNoteRecord, newTab = false): void {
   if (note.url) {
-    void api.links.open(note.url)
+    void (newTab ? api.links.open(note.url, { newTab: true }) : api.links.open(note.url))
+    return
   }
-  else api.workspace.openFile(note.path, note.anchor.type === 'web-selection' ? undefined : note.anchor)
+  const anchor = note.anchor.type === 'web-selection' ? undefined : note.anchor
+  if (newTab) api.workspace.openFile(note.path, anchor, { newTab: true })
+  else api.workspace.openFile(note.path, anchor)
 }
 function compareNotes(a: SideNoteRecord, b: SideNoteRecord, field: SortField): number {
   if (field === 'name') {
@@ -282,7 +285,8 @@ export const FlaggedPanel = (): ReactElement => {
               return (
                 <div key={note.id} data-visible-key={note.id} data-visible-index={index}
                   className={`flagged-note-card${note.flagged ? ' flagged' : ''}${invalid ? ' invalid' : ''}${compact ? ' compact' : ''}`}
-                  onClick={() => { selectSideNote(note, 'left_sidebar'); openNote(note) }} title={note.url ?? note.path}>
+                  onClick={(e) => { selectSideNote(note, 'left_sidebar'); openNote(note, api.ui.hasModKey(e)) }}
+                  onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); openNote(note, true) } }} title={note.url ?? note.path}>
                   <div className="flagged-note-header">
                     <div className="flagged-note-meta-row">
                       <div className="flagged-note-meta-left">
@@ -298,7 +302,7 @@ export const FlaggedPanel = (): ReactElement => {
                         )}
                         <button className={`sidenote-icon-btn sidenote-flag-btn${note.flagged ? ' active' : ''}`}
                           aria-label={note.flagged ? uiText('auto.b855c604e861') : uiText('auto.a774409a00c2')} title={note.flagged ? uiText('auto.b855c604e861') : uiText('auto.a774409a00c2')}
-                          onClick={(e) => { e.stopPropagation(); void patch(note.id, { flagged: !note.flagged }) }}>
+                          onClick={(e) => { e.stopPropagation(); void patch(note.id, { flagged: !note.flagged }) }} onAuxClick={(e) => e.stopPropagation()}>
                           <Flag />
                         </button>
                         <NoteMenu noteId={note.id} openId={menuId} setOpenId={setMenuId}
@@ -318,7 +322,7 @@ export const FlaggedPanel = (): ReactElement => {
                         context={{ ref: { pluginId: 'sideNotes', sourceId: 'notes', itemId: note.id }, sourcePath: note.path || undefined }}
                         onChange={(value) => { void patch(note.id, { note: value }) }} />}
                       {!compact && note.tags && note.tags.length > 0 && (
-                        <div className="sidenote-tags-view" onClick={(e) => e.stopPropagation()}>
+                        <div className="sidenote-tags-view" onClick={(e) => e.stopPropagation()} onAuxClick={(e) => e.stopPropagation()}>
                           {note.tags.map((tag) => (
                             <span key={tag} className="sidenote-tag-view-pill">#{tag}</span>
                           ))}

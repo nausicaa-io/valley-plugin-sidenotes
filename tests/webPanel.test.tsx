@@ -89,7 +89,7 @@ describe('shared SideNote documents', () => {
     const close = vi.fn()
     render(<SideNoteEditModal note={note} onSaved={vi.fn()} onClose={close} />)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
-    fireEvent.change(screen.getByLabelText('Note'), { target: { value: '**Ferns** #wald' } })
+    fireEvent.change(screen.getByLabelText('Annotation'), { target: { value: '**Ferns** #wald' } })
     fireEvent.change(screen.getByRole('combobox', { name: 'Tags' }), { target: { value: '#Äste/jung' } })
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'Tags' }), { key: 'Enter' })
     expect(update).not.toHaveBeenCalled()
@@ -104,10 +104,10 @@ describe('shared SideNote documents', () => {
     const close = vi.fn()
     render(<SideNoteEditModal note={note} onSaved={vi.fn()} onClose={close} />)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
-    fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'Unsaved local Markdown' } })
+    fireEvent.change(screen.getByLabelText('Annotation'), { target: { value: 'Unsaved local Markdown' } })
     await mock.api.data.dataset('sideNotes.note_tags').insert({ noteId: 'n1', tag: 'external' })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save' })) })
-    expect(screen.getByLabelText('Note')).toHaveValue('Unsaved local Markdown')
+    expect(screen.getByLabelText('Annotation')).toHaveValue('Unsaved local Markdown')
     expect(screen.getByRole('alert')).toBeInTheDocument()
     expect((await loadNotes())[0].note).toBe('Original #wald')
     expect(close).not.toHaveBeenCalled()
@@ -371,6 +371,50 @@ describe('SideNotes Panel — website subject', () => {
     expect(screen.getByRole('dialog', { name: 'SideNotes: Edit annotation' })).toBeTruthy()
   })
 
+  it('opens a panel row in a new tab on Cmd-click and middle click, even for the page on screen', async () => {
+    sideNotesRecords(mock).push(webNote())
+    setActiveWeb(mock, { instanceId: 'web-1', url: 'https://example.com/docs', title: 'Docs' })
+    await act(async () => render(<Panel />))
+    const card = (await screen.findByText('page note here')).closest('.sidenote-card')!
+    fireEvent.click(card)
+    expect(mock.api.links.open).not.toHaveBeenCalled()
+    fireEvent.click(card, { metaKey: true, ctrlKey: true })
+    expect(mock.api.links.open).toHaveBeenLastCalledWith('https://example.com/docs', { newTab: true })
+    vi.mocked(mock.api.links.open).mockClear()
+    fireEvent(card, new MouseEvent('auxclick', { bubbles: true, button: 1 }))
+    expect(mock.api.links.open).toHaveBeenLastCalledWith('https://example.com/docs', { newTab: true })
+  })
+
+  it('edits the annotation in a plain textarea that saves on Mod-Enter', async () => {
+    sideNotesRecords(mock).push(webNote())
+    setActiveWeb(mock, { instanceId: 'web-1', url: 'https://example.com/docs', title: 'Docs' })
+    await act(async () => render(<Panel />))
+    await screen.findByText('page note here')
+    fireEvent.click(screen.getByRole('button', { name: 'Note options' }))
+    await act(async () => { await mock.menus[0].find((item) => item.label === 'Edit')?.onSelect?.() })
+    const field = screen.getByLabelText('Annotation')
+    expect(field.tagName).toBe('TEXTAREA')
+    expect(screen.getByRole('dialog', { name: 'SideNotes: Edit annotation' }).querySelector('.cm-lineNumbers, .cm-editor')).toBeNull()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
+    fireEvent.change(field, { target: { value: 'edited **page** note' } })
+    await act(async () => { fireEvent.keyDown(field, { key: 'Enter', metaKey: true, ctrlKey: true }) })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'SideNotes: Edit annotation' })).toBeNull())
+    expect((await loadNotes())[0].note).toBe('edited **page** note')
+  })
+
+  it('opens the annotation from sideNotes:open without the edit dialog', async () => {
+    sideNotesRecords(mock).push(webNote())
+    setActiveWeb(mock, { instanceId: 'web-1', url: 'https://example.com/docs', title: 'Docs' })
+    const { registerSideNoteCommands } = await import('../src/commands')
+    const off = registerSideNoteCommands(mock.api)
+    await act(async () => render(<Panel />))
+    await screen.findByText('page note here')
+    await act(async () => { expect((await mock.api.commands.execute('sideNotes:open', { id: 'w1' })).ok).toBe(true) })
+    expect(mock.api.workspace.revealOwnPanel).toHaveBeenCalledWith('right_sidebar')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    off()
+  })
+
   it('prompts to open something when neither a file nor a website is active', async () => {
     render(<Panel />)
     // findBy* flushes the async note load so the assertion settles inside act().
@@ -434,8 +478,24 @@ describe('SideNotes flagged browser — website notes', () => {
     await provider.extension.open(record, { newTab: true })
 
     await waitFor(() => {
-      expect(mock.api.links.open).toHaveBeenCalledWith('https://other.test/x')
+      expect(mock.api.links.open).toHaveBeenCalledWith('https://other.test/x', { newTab: true })
     })
+    vi.mocked(mock.api.links.open).mockClear()
+    await provider.extension.open({ ...record, id: '' }, { newTab: false })
+    expect(mock.api.links.open).toHaveBeenCalledWith('https://other.test/x')
+  })
+
+  it('opens flagged rows in a new tab on Cmd-click and middle click, in place on a plain click', async () => {
+    sideNotesRecords(mock).push(webNote({ flagged: true, url: 'https://other.test/x', note: 'web row' }), fileNote('f1', 'Notes/Ferns.md', 'file row'))
+    render(<FlaggedPanel />)
+    const web = (await screen.findByText('web row')).closest('.flagged-note-card')!
+    const file = screen.getByText('file row').closest('.flagged-note-card')!
+    fireEvent.click(web, { metaKey: true, ctrlKey: true })
+    expect(mock.api.links.open).toHaveBeenLastCalledWith('https://other.test/x', { newTab: true })
+    fireEvent(file, new MouseEvent('auxclick', { bubbles: true, button: 1 }))
+    expect(mock.api.workspace.openFile).toHaveBeenLastCalledWith('Notes/Ferns.md', { type: 'none' }, { newTab: true })
+    fireEvent.click(file)
+    expect(mock.api.workspace.openFile).toHaveBeenLastCalledWith('Notes/Ferns.md', { type: 'none' })
   })
 
   it('toggles Flagged and All directly and sorts from the compact header popover', async () => {

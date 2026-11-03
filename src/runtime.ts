@@ -18,22 +18,6 @@ export function initRuntime(a: ValleyPluginApi): void {
   React = a.React
 }
 
-export function sideNoteEditStore(): {
-  get(): SideNoteRecord | null
-  publish(note: SideNoteRecord | null): void
-  subscribe(listener: () => void): () => void
-} {
-  return api.runtime.getOrCreate('sideNotes.editRequest', () => {
-    let current: SideNoteRecord | null = null
-    const listeners = new Set<() => void>()
-    return {
-      get: () => current,
-      publish: (note: SideNoteRecord | null) => { current = note; for (const listener of listeners) listener() },
-      subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } }
-    }
-  })
-}
-
 export type SideNoteSelectionDraft =
   | { kind: 'file'; path: string; page: number; snippet: string }
   | { kind: 'web'; url: string; snippet: string }

@@ -262,6 +262,27 @@ export const AnchorEditor = ({
   )
 }
 
+/** The plain note field shared by the create composer and the edit dialog: Markdown stays text, Mod-Enter saves. */
+export const NoteTextarea = ({
+  value, onChange, onSave, onCancel, autoFocus, disabled
+}: {
+  value: string
+  onChange: (value: string) => void
+  onSave: () => void
+  onCancel?: () => void
+  autoFocus?: boolean
+  disabled?: boolean
+}): ReactElement => (
+  <textarea
+    className="sidenote-note-input" value={value} rows={4} autoFocus={autoFocus} disabled={disabled}
+    aria-label={uiText('sideNotes.field.note')} placeholder={uiText('sideNotes.field.note')}
+    onChange={(event) => onChange(event.target.value)}
+    onKeyDown={(event) => {
+      if (event.key === 'Enter' && api.ui.hasModKey(event)) { event.preventDefault(); onSave() }
+      else if (event.key === 'Escape' && onCancel) { event.preventDefault(); event.stopPropagation(); onCancel() }
+    }} />
+)
+
 export const SideNoteEditModal = ({
   note,
   onSaved,
@@ -279,6 +300,13 @@ export const SideNoteEditModal = ({
   const [error, setError] = React.useState('')
   const [documentRevision, setDocumentRevision] = React.useState<DocumentRevision>()
   const documentRef = { pluginId: 'sideNotes', sourceId: 'notes', itemId: note.id }
+  React.useEffect(() => {
+    let active = true
+    void api.documents.read({ pluginId: 'sideNotes', sourceId: 'notes', itemId: note.id }).then((document) => {
+      if (active && document) setDocumentRevision({ expectedRevision: document.revision, vaultGeneration: document.vaultGeneration })
+    }).catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : String(reason)) })
+    return () => { active = false }
+  }, [note.id])
   const cancel = async (): Promise<void> => {
     if (busy) return
     try {
@@ -326,7 +354,7 @@ export const SideNoteEditModal = ({
     onClose={() => void cancel()}
     footer={footer}
   >
-    <api.ui.NoteInput value={text} context={{ ref: documentRef, sourcePath: note.path || undefined }} tags={tags} onTagsChange={setTags} onRevisionChange={(revision) => setDocumentRevision((current) => !current || revision.expectedRevision < current.expectedRevision ? revision : current)} onChange={setText} onSave={() => void save()} onCancel={() => void cancel()} />
+    <NoteTextarea value={text} onChange={setText} onSave={() => void save()} disabled={busy} autoFocus />
     <api.ui.TagInput value={tags} onChange={setTags} />
     <AnchorEditor path={note.path} web={!!note.url} anchor={anchor} onChange={setAnchor} />
     <label><input type="checkbox" checked={flagged} disabled={busy} onChange={(event) => setFlagged(event.target.checked)} />{uiText('sideNotes.field.flagged')}</label>

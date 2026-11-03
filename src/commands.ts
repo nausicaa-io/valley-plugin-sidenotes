@@ -3,7 +3,6 @@ import { appendNoteOrThrow, beforeEffect, captureNoteMutation, copyNote, deleteN
 import { anchorOptions, anchorOptionsForWeb, enrichTextAnchor } from './anchors'
 import { normalizeUrl } from './web'
 import type { SideNoteAnchor, SideNoteRecord } from './types'
-import { sideNoteEditStore } from './runtime'
 import { AnchorReads } from './anchorReads'
 
 const text = { type: 'string', maxLength: 1048576 }
@@ -175,7 +174,6 @@ export async function openSideNoteSubject(api: ValleyPluginApi, note: Pick<SideN
 export function registerSideNoteCommands(api: ValleyPluginApi): () => void {
   let disposed = false
   const session = captureNoteMutation(api, () => { if (disposed) throw new Error('SideNotes commands are no longer active') })
-  const edits = sideNoteEditStore()
   const revision = async (raw: unknown): Promise<unknown> => {
     session.assertActive()
     const input = { ...(raw as { id?: string; path?: string; url?: string }) }
@@ -218,7 +216,6 @@ export function registerSideNoteCommands(api: ValleyPluginApi): () => void {
       session.assertActive()
       await api.workspace.revealOwnPanel('right_sidebar')
       session.assertActive()
-      edits.publish(note)
       return note
     } }),
     register({

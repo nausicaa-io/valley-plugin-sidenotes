@@ -17,27 +17,36 @@ import {
   type AnchorStatus
 } from './anchors'
 import { appendNote, deleteNote, makeNote, makeWebNote, updateNote } from './data'
-import { AnchorEditor, NoteMenu, SideNoteEditModal, SideNotesSortPopover } from './fields'
+import { AnchorEditor, NoteMenu, NoteTextarea, SideNoteEditModal, SideNotesSortPopover } from './fields'
 import { Crosshair, Flag, Globe, Plus, Search, SortAscending, SortDescending, StickyNote, TriangleAlert, X } from './icons'
 import { useActivePath, useActiveWebContext, useNotes, usePending } from './hooks'
 import { normalizeUrl, webHostLabel } from './web'
 import { matchesSearch } from './search'
 import type { SideNoteAnchor, SideNoteRecord } from './types'
 import { uiText } from './localization'
-import { selectionDraftStore, sideNoteEditStore } from './runtime'
+import { selectionDraftStore } from './runtime'
 import { selectSideNote, useSideNoteSubject, useSideNoteViewField } from './surfaces'
 import { AnchorReadCancelled, AnchorReads } from './anchorReads'
 
 /** Open a note's subject: a web note navigates the browser; a file note opens
- *  in the workspace at its anchor. A web note already on screen is a no-op. */
-function openNote(note: SideNoteRecord, activeUrl: string): void {
+ *  in the workspace at its anchor. A web note already on screen is a no-op,
+ *  unless a Mod-click or middle click asks for a new tab. */
+function openNote(note: SideNoteRecord, activeUrl: string, newTab = false): void {
   if (note.url) {
-    if (note.url !== activeUrl) {
-      void api.links.open(note.url)
-    }
+    if (newTab) void api.links.open(note.url, { newTab: true })
+    else if (note.url !== activeUrl) void api.links.open(note.url)
     return
   }
-  api.workspace.openFile(note.path, note.anchor.type === 'web-selection' ? undefined : note.anchor)
+  const anchor = note.anchor.type === 'web-selection' ? undefined : note.anchor
+  if (newTab) api.workspace.openFile(note.path, anchor, { newTab: true })
+  else api.workspace.openFile(note.path, anchor)
+}
+
+/** Middle click opens in a new tab; returns whether the event was one. */
+function middleClick(event: { button: number; preventDefault(): void }): boolean {
+  if (event.button !== 1) return false
+  event.preventDefault()
+  return true
 }
 
 type SortField = 'position' | 'created' | 'updated'
@@ -306,18 +315,6 @@ export const Panel = (): ReactElement => {
   const beginEdit = (note: SideNoteRecord): void => setEditing(note)
 
   React.useEffect(() => {
-    const requests = sideNoteEditStore()
-    const answer = (): void => {
-      const note = requests.get()
-      if (!note) return
-      setEditing(note)
-      requests.publish(null)
-    }
-    answer()
-    return requests.subscribe(answer)
-  }, [])
-
-  React.useEffect(() => {
     const prefill = selectionDrafts.get()
     if (!prefill) return
     const seed = (anchor: SideNoteAnchor): void => {
@@ -417,7 +414,7 @@ export const Panel = (): ReactElement => {
           </div>
           {showCreate && (
             <div className="sidenote-create">
-              <api.ui.NoteInput value={draft} onChange={setDraft} context={{ sourcePath: path || undefined }}
+              <NoteTextarea value={draft} onChange={setDraft}
                 onSave={() => void create()}
                 onCancel={() => { setShowCreate(false); setDraft(''); setDraftTags([]) }}
                 autoFocus />
@@ -447,11 +444,13 @@ export const Panel = (): ReactElement => {
                 return (
                   <article key={note.id} data-visible-key={note.id} data-visible-index={index}
                     className={`sidenote-card${note.flagged ? ' flagged' : ''}${invalid ? ' invalid' : ''}`}
-                    onClick={() => { selectSideNote(note, 'right_sidebar'); openNote(note, subjectUrl) }}>
-                    <div className="sidenote-card-meta" onClick={(e) => e.stopPropagation()}>
+                    onClick={(e) => { selectSideNote(note, 'right_sidebar'); openNote(note, subjectUrl, api.ui.hasModKey(e)) }}
+                    onAuxClick={(e) => { if (middleClick(e)) openNote(note, subjectUrl, true) }}>
+                    <div className="sidenote-card-meta" onClick={(e) => e.stopPropagation()} onAuxClick={(e) => e.stopPropagation()}>
                       {note.anchor.type !== 'none' && (
                         <button className="sidenote-anchor-badge"
-                          onClick={() => openNote(note, subjectUrl)} title={note.url ? uiText('auto.9ee309dcedc9') : `${note.path} · ${anchorLabel(note.anchor)}`}>
+                          onClick={(e) => openNote(note, subjectUrl, api.ui.hasModKey(e))}
+                          onAuxClick={(e) => { if (middleClick(e)) openNote(note, subjectUrl, true) }} title={note.url ? uiText('auto.9ee309dcedc9') : `${note.path} · ${anchorLabel(note.anchor)}`}>
                           {!note.url && note.anchor.type === 'markdown-heading' ? note.path.split('/').pop() : anchorLabel(note.anchor)}
                         </button>
                       )}

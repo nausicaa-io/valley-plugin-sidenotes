@@ -21,7 +21,7 @@ export function registerSearchCard(pluginApi: ValleyPluginApi): () => void {
       // opens at its anchor and reveals our own notes panel.
       const url = str(record.url)
       if (url) {
-        void pluginApi.links.open(url)
+        void (ctx.newTab ? pluginApi.links.open(url, { newTab: true }) : pluginApi.links.open(url))
         return true
       }
       const path = navigablePath(record.path) || navigablePath(ctx.path)

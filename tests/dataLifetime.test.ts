@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createMockValleyApi, type MockValleyApi } from '@valley/plugin-testkit'
 import { appendNote, captureNoteMutation, makeNote, makeWebNote, noteRepository, retargetNotes, shiftLines, updateNote, type DocumentRevision } from '../src/data'
 import { openSideNoteSubject, registerSideNoteCommands, saveNoteValues } from '../src/commands'
-import { initRuntime, sideNoteEditStore } from '../src/runtime'
+import { initRuntime } from '../src/runtime'
 import type { SideNoteRecord } from '../src/types'
 import config from '../config.json'
 
@@ -309,7 +309,6 @@ describe('SideNotes registered command lifetime', () => {
     expect(mock.api.workspace.openFile).toHaveBeenCalledWith('A.md', { type: 'markdown-line', line: 2 })
     const note = await seeded(mock)
     registerSideNoteCommands(mock.api)
-    const edits = sideNoteEditStore()
     const reveal = deferred<void>()
     const entered = deferred<void>()
     vi.spyOn(mock.api.workspace, 'revealOwnPanel').mockImplementation(() => { entered.resolve(); return reveal.promise })
@@ -319,8 +318,6 @@ describe('SideNotes registered command lifetime', () => {
     runtime()
     reveal.resolve()
     await rejected
-    expect(edits.get()).toBeNull()
-    expect(sideNoteEditStore().get()).toBeNull()
   })
 })
 
