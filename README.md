@@ -14,7 +14,7 @@ Keep margin notes alongside the material you are reading. Anchor a note to a fil
 
 Open **Settings → Plugins → GitHub**, click **+**, and enter:
 
-`https://github.com/valley-app/valley-plugin-sidenotes`
+`https://github.com/nausicaa-io/valley-plugin-sidenotes`
 
 Review the repository and plugin details, select **main**, and click **Install**. The repository includes the compiled plugin; installation does not require Git or npm.
 

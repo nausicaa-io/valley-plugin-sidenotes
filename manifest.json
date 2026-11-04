@@ -5,10 +5,10 @@
   "version": "2.1.3",
   "description": "Margin notes anchored to a file, a heading, a line, a PDF selection or a web page — with flags, tags and a cross-vault browser.",
   "author": [
-    "valley"
+    "nausicaa"
   ],
   "authorUrl": [
-    "https://github.com/valley-app"
+    "https://github.com/nausicaa-io"
   ],
   "license": "MIT",
   "minAppVersion": "0.1.0",
