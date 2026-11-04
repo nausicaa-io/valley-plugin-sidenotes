@@ -43,10 +43,9 @@ describe('explicit Workflow owner integration', () => {
 
 describe('Workflow binding fingerprints', () => {
   it('pin each owner command to the host fingerprint and effect of its registered schemas', async () => {
-    const { createHash } = await import('node:crypto')
+    const { commandSchemaFingerprint } = await import('@valley/plugin-sdk/workflow')
     const { createMockValleyApi } = await import('@valley/plugin-testkit')
     const { register: registerPlugin } = await import('../src/index')
-    const canonical = (value: unknown): string => value === undefined || value === null ? 'null' : Array.isArray(value) ? `[${value.map(canonical).join(',')}]` : typeof value === 'object' ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`).join(',')}}` : JSON.stringify(value)
     const mock = createMockValleyApi({ manifest: { id: 'sideNotes', noteDocuments: config.noteDocuments, datasets: config.datasets as never } })
     const registrations = vi.spyOn(mock.api.commands, 'register')
     const dispose = registerPlugin(mock.api)
@@ -55,7 +54,7 @@ describe('Workflow binding fingerprints', () => {
       for (const binding of bindings) {
         const command = commands.find(entry => `sideNotes:${entry.id}` === binding.command)
         expect(command, binding.command).toBeDefined()
-        expect(createHash('sha256').update(canonical({ inputSchema: command!.input?.schema, outputSchema: command!.outputSchema })).digest('hex'), binding.nodeId).toBe(binding.schemaFingerprint)
+        expect(await commandSchemaFingerprint({ inputSchema: command!.input?.schema, outputSchema: command!.outputSchema }), binding.nodeId).toBe(binding.schemaFingerprint)
         expect(command!.sideEffect, binding.nodeId).toBe(binding.effect)
       }
     } finally {
