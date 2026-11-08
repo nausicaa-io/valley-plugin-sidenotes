@@ -29,7 +29,7 @@ describe('owned anchor reads', () => {
     const text = '# Ferns\nneedle\nneedle\nlast'
     const mock = createMockValleyApi({ files: { 'Ferns.md': text } })
     initRuntime(mock.api)
-    const read = vi.spyOn(mock.api.vault, 'readFile')
+    const read = vi.spyOn(mock.api.realm, 'readFile')
     const notes = Array.from({ length: 500 }, (_, index) => note(`n${index}`, index % 2
       ? { type: 'markdown-snippet', snippet: 'needle', line: 99 }
       : { type: 'markdown-line', line: 4, snippet: 'last' }))
@@ -69,7 +69,7 @@ describe('owned anchor reads', () => {
     const large = `${'x'.repeat(5 * 1024 * 1024)}\nlate marker`
     const mock = createMockValleyApi({ files: { 'Ferns.md': large, 'A.md': 'a'.repeat(3 * 1024 * 1024), 'B.md': 'b'.repeat(3 * 1024 * 1024) } })
     initRuntime(mock.api)
-    const read = vi.spyOn(mock.api.vault, 'readFile')
+    const read = vi.spyOn(mock.api.realm, 'readFile')
     const reads = new AnchorReads()
     try {
       const notes = [note('a', { type: 'markdown-snippet', snippet: 'late marker' }), note('b', { type: 'markdown-line', line: 2 })]
@@ -109,7 +109,7 @@ describe('owned anchor reads', () => {
     const mock = createMockValleyApi()
     initRuntime(mock.api)
     const held = deferred<string>()
-    const read = vi.spyOn(mock.api.vault, 'readFile').mockReturnValue(held.promise)
+    const read = vi.spyOn(mock.api.realm, 'readFile').mockReturnValue(held.promise)
     const first = new AnchorReads()
     const old = Promise.allSettled(Array.from({ length: 36 }, (_, index) => first.file(`Old${index}.md`)))
     await expect(first.file('Overflow.md')).rejects.toThrow('Too many SideNotes anchor reads')
@@ -126,7 +126,7 @@ describe('owned anchor reads', () => {
   })
 
   it.each(['dispose', 'replace', 'roundtrip'] as const)('prevents the next page and publication after %s', async action => {
-    const mock = createMockValleyApi({ vault: { path: '/fixture/a', name: 'Ferns', displayName: 'Ferns' } })
+    const mock = createMockValleyApi({ realm: { path: '/fixture/a', name: 'Ferns', displayName: 'Ferns' } })
     initRuntime(mock.api)
     const held = deferred<string | null>()
     const read = vi.spyOn(mock.api.workspace, 'getPdfPageText').mockReturnValue(held.promise)
@@ -137,8 +137,8 @@ describe('owned anchor reads', () => {
     if (action === 'dispose') reads.dispose()
     else if (action === 'replace') initRuntime(createMockValleyApi().api)
     else {
-      mock.emitState({ vault: { path: '/fixture/b', name: 'Moss', displayName: 'Moss' } })
-      mock.emitState({ vault: { path: '/fixture/a', name: 'Ferns', displayName: 'Ferns' } })
+      mock.emitState({ realm: { path: '/fixture/b', name: 'Moss', displayName: 'Moss' } })
+      mock.emitState({ realm: { path: '/fixture/a', name: 'Ferns', displayName: 'Ferns' } })
     }
     held.resolve('first')
     await rejected
@@ -178,7 +178,7 @@ describe('anchor projection effects', () => {
 
   it.each([['Panel', Panel], ['FlaggedPanel', FlaggedPanel]] as const)('%s reports actual anchor read failures and retries without inventing a warning status', async (_name, View) => {
     const mock = setup()
-    vi.spyOn(mock.api.vault, 'readFile').mockRejectedValueOnce(new Error('Fixture read unavailable'))
+    vi.spyOn(mock.api.realm, 'readFile').mockRejectedValueOnce(new Error('Fixture read unavailable'))
     render(React.createElement(View))
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load SideNotes')
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
@@ -190,7 +190,7 @@ describe('anchor projection effects', () => {
     const mock = setup()
     let invalidate = (): void => {}
     vi.spyOn(mock.api.files, 'onAnchorInfoChanged').mockImplementation(listener => { invalidate = listener; return () => {} })
-    const read = vi.spyOn(mock.api.vault, 'readFile').mockResolvedValue('# Moss')
+    const read = vi.spyOn(mock.api.realm, 'readFile').mockResolvedValue('# Moss')
     render(React.createElement(View))
     expect(await screen.findByTitle('Heading not found')).toBeInTheDocument()
     read.mockRejectedValueOnce(new Error('Fixture read unavailable'))
@@ -207,7 +207,7 @@ describe('anchor projection effects', () => {
     const mock = setup()
     mock.datasets.get('sideNotes.notes')!.push({ ...note('moss', { type: 'markdown-heading', heading: 'Moss' }, 'Moss.md'), fileKey: null, url: null })
     const held = deferred<string>()
-    const read = vi.spyOn(mock.api.vault, 'readFile').mockImplementation(path => path === 'Ferns.md' ? held.promise : Promise.resolve('# Moss'))
+    const read = vi.spyOn(mock.api.realm, 'readFile').mockImplementation(path => path === 'Ferns.md' ? held.promise : Promise.resolve('# Moss'))
     render(React.createElement(Panel))
     await waitFor(() => expect(read).toHaveBeenCalledWith('Ferns.md'))
     act(() => mock.emitState({ activePath: 'Moss.md' }))

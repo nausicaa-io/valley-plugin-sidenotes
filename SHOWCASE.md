@@ -10,7 +10,7 @@ Open SideNotes in the right sidebar while you read and add a note for the curren
 
 ## Flag what matters
 
-- Add tags to group related notes across your vault.
+- Add tags to group related notes across your realm.
 - Flag a note to collect it in the left sidebar, where flagged notes from every file stay together.
 - Filter notes by text or `#tag`, and sort them.
 

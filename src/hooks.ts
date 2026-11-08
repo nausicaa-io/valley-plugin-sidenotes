@@ -31,7 +31,7 @@ export function useActivePath(): string | null {
 
 /**
  * The active website (`{instanceId,url,title}`) published by the Web plugin, or
- * null when no browser tab is focused. A web tab has no vault file, so
+ * null when no browser tab is focused. A web tab has no realm file, so
  * `useActivePath()` is null while this is set — the panel keys off this instead.
  */
 export function useActiveWebContext(): ActiveWebContext | null {

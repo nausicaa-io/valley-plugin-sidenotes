@@ -53,7 +53,7 @@ describe('whole-file SideNotes', () => {
     })
     initRuntime(mock.api)
     const dispose = register(mock.api)
-    const read = vi.spyOn(mock.api.vault, 'readFile').mockRejectedValue(new Error('Whole-file notes must not read source contents'))
+    const read = vi.spyOn(mock.api.realm, 'readFile').mockRejectedValue(new Error('Whole-file notes must not read source contents'))
     try {
       expect(anchorOptions(path)).toEqual(['none'])
       expect(defaultAnchor(path)).toEqual({ type: 'none' })
@@ -276,7 +276,7 @@ describe('sideNotes plugin data layer', () => {
         }
       }
     }) as typeof mock.api.data.dataset
-    const stat = vi.spyOn(mock.api.vault, 'stat')
+    const stat = vi.spyOn(mock.api.realm, 'stat')
     const transaction = vi.spyOn(mock.api.data, 'transaction')
 
     const [first, second, third] = await Promise.all([loadNotes(), loadNotes(), loadNotes()])
@@ -624,15 +624,15 @@ describe('SideNotes scoped repository', () => {
   })
 
   it('keeps an old mounted reader from querying a replacement runtime after its dataset notification', async () => {
-    const first = fixture([seed({ note: 'First vault' })])
+    const first = fixture([seed({ note: 'First realm' })])
     const mounted = renderHook(() => useNotes({ kind: 'file', path: 'Notes/A.md' }))
-    await waitFor(() => expect(mounted.result.current.notes[0]?.note).toBe('First vault'))
-    const second = fixture([seed({ note: 'Second vault' })])
+    await waitFor(() => expect(mounted.result.current.notes[0]?.note).toBe('First realm'))
+    const second = fixture([seed({ note: 'Second realm' })])
     const foreignReads = vi.spyOn(second.api.data, 'dataset')
-    await act(async () => { await first.api.data.dataset('sideNotes.notes').upsert(seed({ note: 'Late first vault edit' })) })
+    await act(async () => { await first.api.data.dataset('sideNotes.notes').upsert(seed({ note: 'Late first realm edit' })) })
     act(() => mounted.result.current.reload())
     expect(foreignReads).not.toHaveBeenCalled()
-    expect(mounted.result.current.notes[0].note).toBe('First vault')
+    expect(mounted.result.current.notes[0].note).toBe('First realm')
     mounted.unmount()
   })
 
@@ -643,7 +643,7 @@ describe('SideNotes scoped repository', () => {
     selectSideNote((await loadNotes())[0], 'right_sidebar')
     let release!: () => void
     const held = new Promise<void>((resolve) => { release = resolve })
-    const fileInfo = vi.spyOn(first.api.vault, 'fileInfo').mockImplementation(async () => { await held; return null })
+    const fileInfo = vi.spyOn(first.api.realm, 'fileInfo').mockImplementation(async () => { await held; return null })
     const restoring = old.restore({ v: 1, path: 'Notes/A.md', search: 'Old restore' }, undefined, { background: true })
     const rejected = expect(restoring).rejects.toThrow('no longer active')
     await waitFor(() => expect(fileInfo).toHaveBeenCalledOnce())
@@ -671,7 +671,7 @@ describe('SideNotes scoped repository', () => {
     const surface = mock.api.interop.extensions.providers(PLUGIN_SURFACE_V1).find((entry) => entry.extension.surface === 'right_sidebar')!.extension
     let release!: () => void
     const held = new Promise<void>((resolve) => { release = resolve })
-    const info = vi.spyOn(mock.api.vault, 'fileInfo').mockImplementation(async () => { await held; return { relPath: 'Notes/A.md' } as never })
+    const info = vi.spyOn(mock.api.realm, 'fileInfo').mockImplementation(async () => { await held; return { relPath: 'Notes/A.md' } as never })
     const raw = { v: 1 as const, path: 'Notes/A.md', search: 'Captured' }
     const options = { background: true }
     const first = surface.restore(raw, undefined, options)
@@ -1192,8 +1192,8 @@ describe('SideNotes explicit automation', () => {
       return Promise.resolve().then(() => command.run(command.input!.parse(input) as never, { caller: 'agent', dryRun: false } as never))
     }
     const notes = mock.api.data.dataset('sideNotes.notes')
-    const stat = mock.api.vault.stat.bind(mock.api.vault)
-    const concurrently = (change: () => Promise<unknown>) => vi.spyOn(mock.api.vault, 'stat').mockImplementationOnce(async (path) => { await change(); return stat(path) })
+    const stat = mock.api.realm.stat.bind(mock.api.realm)
+    const concurrently = (change: () => Promise<unknown>) => vi.spyOn(mock.api.realm, 'stat').mockImplementationOnce(async (path) => { await change(); return stat(path) })
     const refused = (code: string) => ({ code, outcome: 'not-applied', retryable: false })
 
     concurrently(() => notes.update({ id: 'sidenote_test' }, { updatedAt: '2026-01-02T00:00:00.000Z' }))

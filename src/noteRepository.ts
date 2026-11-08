@@ -34,7 +34,7 @@ export class NoteRepository {
   private catalogKeys = new Set<string>()
   private dirtyKeys = new Set<string>()
   private sourceRevision: number | null = null
-  private vaultGeneration: number | null = null
+  private realmGeneration: number | null = null
   private catalogPending: Promise<DatasetRecord[]> | null = null
   private pending = new Map<string, Promise<SideNoteRecord[]>>()
   private disposed = false
@@ -49,8 +49,8 @@ export class NoteRepository {
     this.disposers = [NOTES, TAGS, HISTORY].map((dataset) => api.data.dataset(dataset).subscribe((event) => {
       if (!this.isActive()) return
       this.revision++
-      const generationChanged = this.vaultGeneration !== null && this.vaultGeneration !== event.vaultGeneration
-      this.vaultGeneration = event.vaultGeneration
+      const generationChanged = this.realmGeneration !== null && this.realmGeneration !== event.realmGeneration
+      this.realmGeneration = event.realmGeneration
       if (generationChanged) {
         this.catalogRevision++
         this.sourceRevision = null

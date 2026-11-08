@@ -22,13 +22,13 @@ Review the repository and plugin details, select **main**, and click **Install**
 
 Open **SideNotes** in the right sidebar while viewing a file. Add a note for the current context, then use flags and tags to organize it. The left sidebar provides a browser for flagged notes. Adjust file filters and the Aware time range in **Settings → SideNotes**.
 
-SideNotes can attach to any vault file, including code, Office documents, e-books, diagrams, canvas/drawing files, fonts, images, and 3D files. These formats use whole-file notes without position or zoom anchors. Existing Markdown/text, PDF, audio/video, and web anchors remain available. Whole-file notes sort by Updated by default.
+SideNotes can attach to any realm file, including code, Office documents, e-books, diagrams, canvas/drawing files, fonts, images, and 3D files. These formats use whole-file notes without position or zoom anchors. Existing Markdown/text, PDF, audio/video, and web anchors remain available. Whole-file notes sort by Updated by default.
 
 The file-type filter lists your configured extensions first, followed by additional extensions found in saved SideNotes in alphabetical order. No extension and Web appear when relevant. Discovery stays active when the configured list is empty and never changes your saved list. Long filter lists scroll.
 
 ## Your data
 
-Notes, tags, and path history are stored in the vault's plugin data. Updating the plugin, changing its branch, or removing its installation preserves those records and your settings.
+Notes, tags, and path history are stored in the realm's plugin data. Updating the plugin, changing its branch, or removing its installation preserves those records and your settings.
 
 ## Requirements and updates
 
@@ -36,7 +36,7 @@ Requires Valley desktop 0.1.0 or later and plugin API v5. Check for updates from
 
 ## SideNotes for websites
 
-A web tab is a `main_workspace` plugin tab with **no vault file**, so the host's
+A web tab is a `main_workspace` plugin tab with **no realm file**, so the host's
 `activePath` is null while a site is focused. Surfing and SideNotes interact only
 through optional versioned contracts; either plugin works normally without the
 other.

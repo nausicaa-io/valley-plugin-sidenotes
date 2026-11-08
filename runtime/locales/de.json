@@ -71,7 +71,7 @@
   "auto.f6fdbe48dc54": "Löschen",
   "auto.f8db8a172be6": "markiert",
   "auto.ff4f3043a289": "Markierte Notizen filtern",
-  "manifest.description": "Randnotizen, verankert an einer Datei, Überschrift, Zeile, PDF-Auswahl oder Webseite — mit Markierungen, Tags und einem vault-weiten Browser.",
+  "manifest.description": "Randnotizen, verankert an einer Datei, Überschrift, Zeile, PDF-Auswahl oder Webseite — mit Markierungen, Tags und einem realm-weiten Browser.",
   "manifest.name": "Randnotizen",
   "markdown.examples.currentNote": "Aktuelle Notiz",
   "markdown.examples.filtered": "Gefilterte Ergebnisse",

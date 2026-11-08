@@ -71,7 +71,7 @@
   "auto.f6fdbe48dc54": "删除",
   "auto.f8db8a172be6": "标记",
   "auto.ff4f3043a289": "过滤标记的笔记",
-  "manifest.description": "锚定到文件、标题、行、PDF 选区或网页的旁注——带标记、标签和跨仓库浏览器。",
+  "manifest.description": "锚定到文件、标题、行、PDF 选区或网页的旁注——带标记、标签和跨 Realm 浏览器。",
   "manifest.name": "旁注",
   "markdown.examples.currentNote": "当前笔记",
   "markdown.examples.filtered": "筛选结果",

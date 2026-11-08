@@ -49,8 +49,8 @@ async function turns() { for (let index = 0; index < 15; index++) await Promise.
 describe('SideNotes mutation session lifetime', () => {
   it('rejects a deferred stat after A → B → A without dispatching a transaction', async () => {
     const first = runtime()
-    const held = deferred<Awaited<ReturnType<typeof first.api.vault.stat>>>()
-    vi.spyOn(first.api.vault, 'stat').mockReturnValue(held.promise)
+    const held = deferred<Awaited<ReturnType<typeof first.api.realm.stat>>>()
+    vi.spyOn(first.api.realm, 'stat').mockReturnValue(held.promise)
     const transaction = vi.spyOn(first.api.data, 'transaction')
     const result = appendNote(makeNote('Notes/A.md', 'Accepted', { type: 'none' }))
     const rejected = expect(result).rejects.toThrow('no longer active')
@@ -66,19 +66,19 @@ describe('SideNotes mutation session lifetime', () => {
   it('copies admitted record arrays, anchor, and document revision before a delayed stat', async () => {
     const mock = runtime()
     const note = await seeded(mock)
-    const held = deferred<Awaited<ReturnType<typeof mock.api.vault.stat>>>()
-    vi.spyOn(mock.api.vault, 'stat').mockReturnValue(held.promise)
+    const held = deferred<Awaited<ReturnType<typeof mock.api.realm.stat>>>()
+    vi.spyOn(mock.api.realm, 'stat').mockReturnValue(held.promise)
     const write = vi.spyOn(mock.api.documents, 'update').mockResolvedValue({} as never)
-    const revision: DocumentRevision = { expectedRevision: 3, vaultGeneration: 7 }
+    const revision: DocumentRevision = { expectedRevision: 3, realmGeneration: 7 }
     const next = { ...note, note: 'Accepted edit', tags: ['accepted'], anchor: { type: 'markdown-line' as const, line: 5 }, pathHistory: ['Accepted/old.md'] }
     const result = updateNote(note.id, next, note.updatedAt, revision)
     next.note = 'Late edit'; next.tags[0] = 'late'; next.anchor.line = 99; next.pathHistory[0] = 'Late.md'
-    revision.expectedRevision = 99; revision.vaultGeneration = 99
+    revision.expectedRevision = 99; revision.realmGeneration = 99
     held.resolve({ dev: 1, ino: 2 })
     expect(await result).toBe(true)
     expect(write).toHaveBeenCalledOnce()
     expect(write.mock.calls[0][1]).toMatchObject({
-      expectedRevision: 3, vaultGeneration: 7, body: 'Accepted edit', explicitTags: ['accepted'],
+      expectedRevision: 3, realmGeneration: 7, body: 'Accepted edit', explicitTags: ['accepted'],
       operations: [
         { dataset: 'sideNotes.notes', operation: 'update', key: { id: note.id }, values: { anchor: { type: 'markdown-line', line: 5 } } },
         { dataset: 'sideNotes.path_history', operation: 'delete', key: { noteId: note.id, position: 0 } },
@@ -196,7 +196,7 @@ describe('SideNotes registered command lifetime', () => {
     if (mode === 'dispose') off()
     else { runtime(); initRuntime(mock.api) }
     const dataset = vi.spyOn(mock.api.data, 'dataset')
-    const file = vi.spyOn(mock.api.vault, 'fileInfo')
+    const file = vi.spyOn(mock.api.realm, 'fileInfo')
     const inputs = [{}, { id: 'id' }, { id: 'id' }, { path: 'A.md', note: 'Text' }, { id: 'id', values: { note: 'Text' } }, { id: 'id' }]
     for (let index = 0; index < commands.length; index++) await expect(commands[index].run(inputs[index])).rejects.toThrow('no longer active')
     await expect(commands[3].revision({ path: 'A.md' })).rejects.toThrow('no longer active')
@@ -208,10 +208,10 @@ describe('SideNotes registered command lifetime', () => {
   it('does not begin anchor enrichment or a mutation after delayed fileInfo and disposal', async () => {
     const mock = runtime()
     const off = registerSideNoteCommands(mock.api)
-    const held = deferred<Awaited<ReturnType<typeof mock.api.vault.fileInfo>>>()
-    vi.spyOn(mock.api.vault, 'fileInfo').mockReturnValue(held.promise)
-    const read = vi.spyOn(mock.api.vault, 'readFile')
-    const stat = vi.spyOn(mock.api.vault, 'stat')
+    const held = deferred<Awaited<ReturnType<typeof mock.api.realm.fileInfo>>>()
+    vi.spyOn(mock.api.realm, 'fileInfo').mockReturnValue(held.promise)
+    const read = vi.spyOn(mock.api.realm, 'readFile')
+    const stat = vi.spyOn(mock.api.realm, 'stat')
     const result = command(mock, 'create').run({ path: 'A.md', note: 'Text', anchor: { type: 'markdown-line', line: 1 } })
     const rejected = expect(result).rejects.toThrow('no longer active')
     off()
@@ -224,16 +224,16 @@ describe('SideNotes registered command lifetime', () => {
   it('rejects a captured anchor read after runtime rebinding without a new stat or write', async () => {
     const mock = runtime()
     registerSideNoteCommands(mock.api)
-    vi.spyOn(mock.api.vault, 'fileInfo').mockResolvedValue({ relPath: 'A.md' } as never)
+    vi.spyOn(mock.api.realm, 'fileInfo').mockResolvedValue({ relPath: 'A.md' } as never)
     const held = deferred<string>()
     const entered = deferred<void>()
-    vi.spyOn(mock.api.vault, 'readFile').mockImplementation(() => { entered.resolve(); return held.promise })
-    const stat = vi.spyOn(mock.api.vault, 'stat')
+    vi.spyOn(mock.api.realm, 'readFile').mockImplementation(() => { entered.resolve(); return held.promise })
+    const stat = vi.spyOn(mock.api.realm, 'stat')
     const result = command(mock, 'create').run({ path: 'A.md', note: 'Text', anchor: { type: 'markdown-line', line: 1 } })
     const rejected = expect(result).rejects.toThrow('no longer active')
     await entered.promise
     const other = runtime()
-    const otherRead = vi.spyOn(other.api.vault, 'readFile')
+    const otherRead = vi.spyOn(other.api.realm, 'readFile')
     held.resolve('First line')
     await rejected
     expect(stat).not.toHaveBeenCalled()
@@ -281,8 +281,8 @@ describe('SideNotes registered command lifetime', () => {
   it('copies create inputs before fileInfo and binds its undo to registration disposal', async () => {
     const mock = runtime()
     const off = registerSideNoteCommands(mock.api)
-    const held = deferred<Awaited<ReturnType<typeof mock.api.vault.fileInfo>>>()
-    vi.spyOn(mock.api.vault, 'fileInfo').mockReturnValue(held.promise)
+    const held = deferred<Awaited<ReturnType<typeof mock.api.realm.fileInfo>>>()
+    vi.spyOn(mock.api.realm, 'fileInfo').mockReturnValue(held.promise)
     const input = { path: 'A.md', note: 'Accepted', tags: ['accepted'], anchor: { type: 'markdown-line' as const, line: 1 } }
     const result = command(mock, 'create').run(input)
     input.path = 'B.md'; input.note = 'Alias'; input.tags[0] = 'alias'; input.anchor.line = 9
@@ -299,8 +299,8 @@ describe('SideNotes registered command lifetime', () => {
 
   it('preserves the admitted open subject and prevents publication after a delayed panel reveal', async () => {
     const mock = runtime()
-    const held = deferred<Awaited<ReturnType<typeof mock.api.vault.fileInfo>>>()
-    vi.spyOn(mock.api.vault, 'fileInfo').mockReturnValue(held.promise)
+    const held = deferred<Awaited<ReturnType<typeof mock.api.realm.fileInfo>>>()
+    vi.spyOn(mock.api.realm, 'fileInfo').mockReturnValue(held.promise)
     const subject = { path: 'A.md', anchor: { type: 'markdown-line' as const, line: 2 } }
     const opened = openSideNoteSubject(mock.api, subject)
     subject.path = 'B.md'; subject.anchor.line = 99
@@ -326,7 +326,7 @@ describe('SideNotes create/delete undo and open refusals', () => {
 
   async function created(mock: MockValleyApi) {
     registerSideNoteCommands(mock.api)
-    vi.spyOn(mock.api.vault, 'fileInfo').mockResolvedValue({ relPath: 'A.md' } as never)
+    vi.spyOn(mock.api.realm, 'fileInfo').mockResolvedValue({ relPath: 'A.md' } as never)
     return command(mock, 'create').run({ path: 'A.md', note: 'Created' })
   }
 

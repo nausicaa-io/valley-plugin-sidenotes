@@ -98,7 +98,7 @@ export function register(api: ValleyPluginApi): () => void {
   api.registerView('sideNotes.settings', Settings)
 
   const offFence = registerSideNotesFence()
-  // We own how our hits look and behave in vault-wide search.
+  // We own how our hits look and behave in realm-wide search.
   const offSearchCard = registerSearchCard(api)
 
   return () => {

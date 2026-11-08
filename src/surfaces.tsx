@@ -173,7 +173,7 @@ export function registerSideNoteSurfaces(pluginApi: ValleyPluginApi): () => void
       const note = typeof raw.noteId === 'string' ? await requireSideNote(raw.noteId, mutation) : null
       assertRestore()
       const fileExists = async (path: string): Promise<boolean> => {
-        const info = await pluginApi.vault.fileInfo(path)
+        const info = await pluginApi.realm.fileInfo(path)
         assertRestore()
         return !!info
       }

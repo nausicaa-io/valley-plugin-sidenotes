@@ -30,7 +30,7 @@ function fixture(rows: DatasetRecord[]) {
   const queries: Array<{ dataset: string; query: DatasetQuery }> = []
   let revision = 0
   let generation = 1
-  const vault = mock.api.getState().vault
+  const realm = mock.api.getState().realm
   const intercept = vi.fn<(dataset: string, query: DatasetQuery, page: DatasetPage) => Promise<DatasetPage>>(async (_id, _query, page) => page)
   mock.api.data.dataset = ((id: string) => {
     const handle = dataset(id)
@@ -50,12 +50,12 @@ function fixture(rows: DatasetRecord[]) {
       }
     }
   }) as typeof dataset
-  const owner = new NoteRepository(mock.api, () => mock.api.getState().vault?.path === vault?.path, row => ({ ...row, id: String(row.id).trim(), path: String(row.path).trim(), url: normalizeUrl(String(row.url ?? '')) }) as unknown as SideNoteRecord)
+  const owner = new NoteRepository(mock.api, () => mock.api.getState().realm?.path === realm?.path, row => ({ ...row, id: String(row.id).trim(), path: String(row.path).trim(), url: normalizeUrl(String(row.url ?? '')) }) as unknown as SideNoteRecord)
   owners.push(owner)
   const emit = (keys: DatasetChangeEvent['keys'], options: Partial<DatasetChangeEvent> = {}) => {
     revision = options.revision ?? revision + 1
-    generation = options.vaultGeneration ?? generation
-    const event: DatasetChangeEvent = { dataset: NOTES, reason: 'update', revision, vaultGeneration: generation, keys, ...options }
+    generation = options.realmGeneration ?? generation
+    const event: DatasetChangeEvent = { dataset: NOTES, reason: 'update', revision, realmGeneration: generation, keys, ...options }
     for (const listener of listeners.get(event.dataset) ?? []) listener(event)
   }
   const update = async (id: string, values: DatasetRecord) => {
@@ -64,9 +64,9 @@ function fixture(rows: DatasetRecord[]) {
   }
   return { mock, owner, dataset, queries, intercept, emit, update,
     projected: () => queries.filter(({ dataset, query }) => dataset === NOTES && query.select),
-    switchVault: () => {
-      mock.emitState({ vault: { path: '/fixture/b', name: 'Moss', displayName: 'Moss' } })
-      mock.emitState({ vault })
+    switchRealm: () => {
+      mock.emitState({ realm: { path: '/fixture/b', name: 'Moss', displayName: 'Moss' } })
+      mock.emitState({ realm })
     },
     silentUpdate: async (id: string, values: DatasetRecord) => { await dataset(NOTES).update({ id }, values); revision++ },
     listeners
@@ -111,7 +111,7 @@ describe('retained SideNotes subject projection', () => {
     if (reason === 'missing keys') f.emit(undefined)
     else if (reason === 'empty keys') f.emit([])
     else if (reason === 'revision gap') f.emit([{ id: 'b' }], { revision: 8 })
-    else if (reason === 'generation') f.emit([{ id: 'b' }], { vaultGeneration: 2 })
+    else if (reason === 'generation') f.emit([{ id: 'b' }], { realmGeneration: 2 })
     else if (reason === 'key overflow') f.emit(Array.from({ length: 4097 }, () => ({ id: 'b' })))
     else f.emit([{ id: 'unseen' }])
     expect((await f.owner.load(scope)).map(row => row.id)).toEqual(['a', 'b'])
@@ -156,7 +156,7 @@ describe('retained SideNotes subject projection', () => {
     expect(f.projected()[0].query.where).toBeUndefined()
   })
 
-  it('rejects an old owner after accepted work settles and dispatches no reads in the new vault', async () => {
+  it('rejects an old owner after accepted work settles and dispatches no reads in the new realm', async () => {
     const f = fixture([note('a')])
     await f.owner.load(scope)
     await f.update('a', { note: 'Changed' })
@@ -166,7 +166,7 @@ describe('retained SideNotes subject projection', () => {
     const pending = f.owner.load(scope)
     const rejected = expect(pending).rejects.toThrow('no longer active')
     await vi.waitFor(() => expect(captured).toBeDefined())
-    f.switchVault()
+    f.switchRealm()
     expect(f.owner.isActive()).toBe(false)
     const reads = f.queries.length
     held.resolve(captured)

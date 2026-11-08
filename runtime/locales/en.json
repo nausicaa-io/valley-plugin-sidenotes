@@ -71,7 +71,7 @@
   "auto.f6fdbe48dc54": "Delete",
   "auto.f8db8a172be6": "Flagged",
   "auto.ff4f3043a289": "Filter flagged notes",
-  "manifest.description": "Margin notes anchored to a file, a heading, a line, a PDF selection or a web page — with flags, tags and a cross-vault browser.",
+  "manifest.description": "Margin notes anchored to a file, a heading, a line, a PDF selection or a web page — with flags, tags and a cross-realm browser.",
   "manifest.name": "SideNotes",
   "markdown.examples.currentNote": "Current note",
   "markdown.examples.filtered": "Filtered results",

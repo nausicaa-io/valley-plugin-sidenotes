@@ -11,7 +11,7 @@ const disposers: Array<() => void> = []
 afterEach(() => { cleanup(); for (const dispose of disposers.splice(0)) dispose() })
 
 function fixture(path = 'Ferns.md') {
-  const mock = createMockValleyApi({ manifest: { id: 'sideNotes' }, activePath: path, vault: { path: '/fixture/a', name: 'Ferns', displayName: 'Ferns' } })
+  const mock = createMockValleyApi({ manifest: { id: 'sideNotes' }, activePath: path, realm: { path: '/fixture/a', name: 'Ferns', displayName: 'Ferns' } })
   initRuntime(mock.api)
   const reader = noteRepository()
   disposers.push(() => reader.dispose())
@@ -95,13 +95,13 @@ describe('captured subject hook lifetimes', () => {
     expect(f.reader.isActive()).toBe(false)
   })
 
-  it('holds snapshots through a same-API vault A→B→A and later browser notifications', () => {
+  it('holds snapshots through a same-API realm A→B→A and later browser notifications', () => {
     const f = fixture()
     const hook = renderHook(useSubject)
     const previous = hook.result.current
     act(() => {
-      f.mock.emitState({ activePath: 'B.md', vault: { path: '/fixture/b', name: 'Moss', displayName: 'Moss' } })
-      f.mock.emitState({ activePath: 'New-A.md', vault: { path: '/fixture/a', name: 'Ferns', displayName: 'Ferns' } })
+      f.mock.emitState({ activePath: 'B.md', realm: { path: '/fixture/b', name: 'Moss', displayName: 'Moss' } })
+      f.mock.emitState({ activePath: 'New-A.md', realm: { path: '/fixture/a', name: 'Ferns', displayName: 'Ferns' } })
       f.remove()
     })
     hook.rerender()

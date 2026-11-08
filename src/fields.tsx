@@ -303,7 +303,7 @@ export const SideNoteEditModal = ({
   React.useEffect(() => {
     let active = true
     void api.documents.read({ pluginId: 'sideNotes', sourceId: 'notes', itemId: note.id }).then((document) => {
-      if (active && document) setDocumentRevision({ expectedRevision: document.revision, vaultGeneration: document.vaultGeneration })
+      if (active && document) setDocumentRevision({ expectedRevision: document.revision, realmGeneration: document.realmGeneration })
     }).catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : String(reason)) })
     return () => { active = false }
   }, [note.id])

@@ -166,7 +166,7 @@ export async function openSideNoteSubject(api: ValleyPluginApi, note: Pick<SideN
     session.assertActive()
     if (result.status === 'failed' || result.status === 'unavailable') refused('TARGET_UNAVAILABLE', result.message ?? 'Destination unavailable')
   } else {
-    const file = await api.vault.fileInfo(subject.path)
+    const file = await api.realm.fileInfo(subject.path)
     session.assertActive()
     if (!file) refused('TARGET_NOT_FOUND', 'The annotation file no longer exists.')
     const anchor = subject.anchor.type === 'web-selection' ? undefined : subject.anchor
@@ -182,7 +182,7 @@ export function registerSideNoteCommands(api: ValleyPluginApi): () => void {
     session.assertActive()
     const input = { ...(raw as { id?: string; path?: string; url?: string }) }
     if (input.id) return requireSideNote(input.id, session)
-    const value = input.path ? await api.vault.fileInfo(input.path) : { url: input.url }
+    const value = input.path ? await api.realm.fileInfo(input.path) : { url: input.url }
     session.assertActive()
     return value
   }
@@ -244,7 +244,7 @@ export function registerSideNoteCommands(api: ValleyPluginApi): () => void {
       const note = await beforeEffect(async () => {
         session.assertActive()
         if (accepted.path) {
-          const file = await api.vault.fileInfo(accepted.path)
+          const file = await api.realm.fileInfo(accepted.path)
           session.assertActive()
           if (!file) refused('TARGET_NOT_FOUND', 'The annotation file does not exist.')
         }

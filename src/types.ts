@@ -18,7 +18,7 @@ export interface SideNoteFileKey {
 /**
  * One SideNote record assembled from the plugin-owned relational datasets.
  *
- * A note's *subject* is either a vault file (`path` set, `url` absent) or a web
+ * A note's *subject* is either a realm file (`path` set, `url` absent) or a web
  * page (`url` set — the normalized page URL — with `path: ''`). File-only fields
  * (`pathHistory`, `fileKey`) stay empty/absent for web notes.
  */

@@ -40,7 +40,7 @@ export class AnchorReads {
 
   constructor(private readonly owner: ValleyPluginApi = api) {
     this.generation = runtimeGeneration
-    this.root = owner.getState().vault?.path ?? null
+    this.root = owner.getState().realm?.path ?? null
     this.queue = queues.get(owner) ?? { active: 0, tasks: [] }
     queues.set(owner, this.queue)
     this.unsubscribe = owner.subscribe(() => { if (!this.isActive()) this.dispose() })
@@ -48,7 +48,7 @@ export class AnchorReads {
 
   isActive(): boolean {
     if (this.disposed || this.owner !== api || this.generation !== runtimeGeneration) return false
-    try { return (this.owner.getState().vault?.path ?? null) === this.root } catch { return false }
+    try { return (this.owner.getState().realm?.path ?? null) === this.root } catch { return false }
   }
 
   assertActive(): void { if (!this.isActive()) throw new AnchorReadCancelled() }
@@ -68,7 +68,7 @@ export class AnchorReads {
   }
 
   file(path: string): Promise<string | null> {
-    return this.request(JSON.stringify(['file', path]), () => this.owner.vault.readFile(path))
+    return this.request(JSON.stringify(['file', path]), () => this.owner.realm.readFile(path))
   }
 
   page(path: string, page: number): Promise<string | null> {

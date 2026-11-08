@@ -58,7 +58,7 @@ const DEFAULT_DIR: Record<SortField, SortDir> = { position: 'asc', created: 'des
 export const Panel = (): ReactElement => {
   const filePath = useActivePath() ?? ''
   const web = useActiveWebContext()
-  // A web tab has no vault file, so `filePath` is empty while a site is focused.
+  // A web tab has no realm file, so `filePath` is empty while a site is focused.
   // Subject = the file (when one is open) else the active website else nothing.
   const isWeb = !filePath && !!web?.url
   const subjectUrl = isWeb && web ? normalizeUrl(web.url) : ''

@@ -225,7 +225,7 @@ describe('SideNotes whole-file panel', () => {
       activePath: path
     })
     initRuntime(mock.api)
-    const read = vi.spyOn(mock.api.vault, 'readFile')
+    const read = vi.spyOn(mock.api.realm, 'readFile')
     await act(async () => { render(<Panel />) })
     await screen.findByText('Newer canopy note')
     expect(screen.queryByRole('button', { name: 'Aware mode' })).not.toBeInTheDocument()
@@ -654,7 +654,7 @@ it.each([Panel, FlaggedPanel])('bounds large SideNotes surfaces without losing f
   const state = mock.api.getState()
   expect(state.indexEntries).toEqual([])
   const scoped = new Proxy(state, { get: (target, key) => {
-    if (key === 'indexEntries') throw new Error('SideNotes must not read the whole vault index')
+    if (key === 'indexEntries') throw new Error('SideNotes must not read the whole realm index')
     return Reflect.get(target, key)
   } })
   vi.spyOn(mock.api, 'getState').mockReturnValue(scoped)

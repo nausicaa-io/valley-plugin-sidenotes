@@ -269,7 +269,7 @@ export async function enrichTextAnchor(path: string, anchor: SideNoteAnchor, rea
     anchor.type !== 'markdown-snippet'
   )
     return anchor
-  const text = reader ? await reader.file(path) : await api.vault.readFile(path)
+  const text = reader ? await reader.file(path) : await api.realm.readFile(path)
   reader?.assertActive()
   if (!text) return anchor
   const lines = text.replace(/\r\n?/g, '\n').split('\n')
@@ -395,7 +395,7 @@ export function anchorValidationMsg(anchor: SideNoteAnchor, status: AnchorStatus
 
 /** Read all heading texts from a file (for the heading anchor datalist). */
 export async function readHeadings(path: string): Promise<string[]> {
-  const text = await api.vault.readFile(path)
+  const text = await api.realm.readFile(path)
   if (!text) return []
   return text
     .replace(/\r\n?/g, '\n')

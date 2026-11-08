@@ -77,7 +77,7 @@ function normalize(raw: DataRecord): SideNoteRecord | null {
   const path = str(raw.path).trim()
   const url = normalizeUrl(str(raw.url))
   const note = str(raw.note).trim()
-  // A note needs a body and a subject — either a vault file (`path`) or a web
+  // A note needs a body and a subject — either a realm file (`path`) or a web
   // page (`url`). A web note carries `url` and an empty `path`.
   if (!id || !note || (!path && !url)) return null
   const createdAt = str(raw.createdAt) || nowIso()
@@ -140,7 +140,7 @@ export function copyNote(record: SideNoteRecord): SideNoteRecord {
 async function withFileKey(record: SideNoteRecord, session: NoteMutationSession): Promise<SideNoteRecord> {
   session.assertActive()
   if (!record.path) return record
-  const key = await session.api.vault.stat(record.path)
+  const key = await session.api.realm.stat(record.path)
   session.assertActive()
   return key ? { ...record, fileKey: { dev: key.dev, ino: key.ino } } : record
 }
@@ -205,13 +205,13 @@ async function relationDeletes(session: NoteMutationSession, noteId: string): Pr
 export function noteRepository(): NoteRepository {
   const owner = api
   const generation = runtimeGeneration
-  const root = owner.getState().vault?.path ?? null
+  const root = owner.getState().realm?.path ?? null
   const slot = owner.runtime.getOrCreate('sideNotes.noteRepository', () => ({ current: null as NoteRepository | null }))
   if (slot.current?.isActive()) return slot.current
   slot.current?.dispose()
   slot.current = new NoteRepository(owner, () => {
     if (owner !== api || generation !== runtimeGeneration) return false
-    try { return (owner.getState().vault?.path ?? null) === root } catch { return false }
+    try { return (owner.getState().realm?.path ?? null) === root } catch { return false }
   }, (row) => normalize(row as DataRecord))
   return slot.current
 }
@@ -342,7 +342,7 @@ async function writeNoteUpdate(id: string, next: SideNoteRecord, expectedUpdated
   delete row.note
   await dispatchWrite(() => session.api.documents.update(ref, {
     expectedRevision: revision?.expectedRevision ?? baseline.revision,
-    vaultGeneration: revision?.vaultGeneration ?? baseline.vaultGeneration,
+    realmGeneration: revision?.realmGeneration ?? baseline.realmGeneration,
     body: next.note,
     explicitTags: next.tags,
     operations: [
