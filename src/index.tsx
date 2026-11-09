@@ -78,6 +78,7 @@ export function register(api: ValleyPluginApi): () => void {
 
   const highlightCommand: PluginCommand<void, null, 'execute'> & { outputSchema: Record<string, unknown> } = {
     id: 'highlight-selection',
+    menu: { group: 'create', order: 10, label: 'New SideNote from Selection', labelKey: 'menu.newFromSelection' },
     label: 'Create SideNote from selection', labelKey: 'auto.94fd67ed6c0c',
     hotkey: 'Mod-Shift-h',
     sideEffect: 'execute',

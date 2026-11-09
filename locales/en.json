@@ -110,5 +110,6 @@
   "sideNotes.error.load": "Could not load SideNotes. Try again.",
   "sideNotes.action.retry": "Retry",
   "bookmark.view": "Notes and filters",
-  "bookmark.item": "Selected item"
+  "bookmark.item": "Selected item",
+  "menu.newFromSelection": "New SideNote from Selection"
 }

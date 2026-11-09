@@ -110,5 +110,6 @@
   "sideNotes.error.load": "Impossible de charger les SideNotes. Réessayez.",
   "sideNotes.action.retry": "Réessayer",
   "bookmark.view": "Notes et filtres",
-  "bookmark.item": "Élément sélectionné"
+  "bookmark.item": "Élément sélectionné",
+  "menu.newFromSelection": "Nouvelle SideNote depuis la sélection"
 }

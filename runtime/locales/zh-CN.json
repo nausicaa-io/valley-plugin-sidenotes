@@ -110,5 +110,6 @@
   "sideNotes.error.load": "无法加载 SideNotes。请重试。",
   "sideNotes.action.retry": "重试",
   "bookmark.view": "笔记与筛选",
-  "bookmark.item": "所选项目"
+  "bookmark.item": "所选项目",
+  "menu.newFromSelection": "从所选内容新建 SideNote"
 }
