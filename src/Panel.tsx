@@ -1,4 +1,5 @@
 import { React, api } from './runtime'
+import { visibleTimer } from './visibleTimer'
 import { useVisibleRange } from './visibleRange'
 import type { ReactElement } from 'react'
 import { classifyFilePath } from '@valley/plugin-sdk/fileTypes'
@@ -136,10 +137,10 @@ export const Panel = (): ReactElement => {
     read()
     const off = api.files.onActivePositionChanged(read)
     const isMedia = fileKind === 'video' || fileKind === 'audio'
-    const timer = isMedia ? window.setInterval(read, 1000) : undefined
+    const stop = isMedia ? visibleTimer(document, read, 1000) : undefined
     return () => {
       off()
-      if (timer) window.clearInterval(timer)
+      stop?.()
     }
   }, [aware, path, fileKind, positional, readActiveContext])
 
