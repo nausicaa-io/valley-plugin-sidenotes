@@ -76,9 +76,14 @@ export function register(api: ValleyPluginApi): () => void {
     run: capture
   } satisfies TextSelectionAction)
 
+  const selectedPdfText = () => {
+    const path = api.getState().activePath
+    return path && classifyFilePath(path) === 'pdf' ? extractFromSelection(path, api.workspace.getTextSelection()) : null
+  }
+  const highlightMenu = { group: 'create', order: 10, label: 'New SideNote from Selection', labelKey: 'menu.newFromSelection' }
   const highlightCommand: PluginCommand<void, null, 'execute'> & { outputSchema: Record<string, unknown> } = {
     id: 'highlight-selection',
-    menu: { group: 'create', order: 10, label: 'New SideNote from Selection', labelKey: 'menu.newFromSelection' },
+    menu: highlightMenu,
     label: 'Create SideNote from selection', labelKey: 'auto.94fd67ed6c0c',
     hotkey: 'Mod-Shift-h',
     sideEffect: 'execute',
@@ -86,13 +91,23 @@ export function register(api: ValleyPluginApi): () => void {
     input: { schema: { type: 'object', properties: {}, additionalProperties: false }, parse: () => undefined },
     run: async () => {
       if (!mutation.isActive()) return null
-      const path = api.getState().activePath
-      const detail = path && classifyFilePath(path) === 'pdf' ? extractFromSelection(path, api.workspace.getTextSelection()) : null
+      const detail = selectedPdfText()
       if (detail) await capture({ surface: 'pdf', ...detail })
       return null
     }
   }
-  const offHighlightCmd = api.commands.register(highlightCommand)
+  // Menu metadata is fixed per registration, so the item is registered again whenever a PDF selection appears or goes.
+  let offHighlightCmd = (): void => {}
+  let highlightEnabled: boolean | null = null
+  const syncHighlightCommand = (): void => {
+    const enabled = selectedPdfText() !== null
+    if (enabled === highlightEnabled) return
+    highlightEnabled = enabled
+    offHighlightCmd()
+    offHighlightCmd = api.commands.register({ ...highlightCommand, menu: { ...highlightMenu, enabled } })
+  }
+  syncHighlightCommand()
+  const offSelectionChanged = api.workspace.onTextSelectionChanged(syncHighlightCommand)
 
   api.registerView('sideNotes.panel', Panel)
   api.registerView('sideNotes.flagged', FlaggedPanel)
@@ -110,6 +125,7 @@ export function register(api: ValleyPluginApi): () => void {
     offSurfaces()
     offLineShift()
     offSelection()
+    offSelectionChanged()
     offHighlightCmd()
     offFence()
     offSearchCard()

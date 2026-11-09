@@ -1086,6 +1086,38 @@ describe('sideNotes styles — anchor pill', () => {
   })
 })
 
+describe('SideNotes selection menu item', () => {
+  it('is enabled only while the active PDF has a selection and survives the switch back', () => {
+    const mock = createMockValleyApi({ manifest: { id: 'sideNotes', noteDocuments: config.noteDocuments, datasets: config.datasets as unknown as ValleyPluginManifest['datasets'] } })
+    let selection: { surface: string; path: string; page: number; text: string } | null = null
+    let changed = (): void => {}
+    let activePath = 'Notes/A.md'
+    vi.spyOn(mock.api, 'getState').mockImplementation(() => ({ activePath }) as never)
+    vi.spyOn(mock.api.workspace, 'getTextSelection').mockImplementation(() => selection as never)
+    vi.spyOn(mock.api.workspace, 'onTextSelectionChanged').mockImplementation(listener => { changed = listener; return () => {} })
+    const registrations = vi.spyOn(mock.api.commands, 'register')
+    const dispose = register(mock.api)
+    const items = () => registrations.mock.calls.map(([value]) => value).filter(value => value.id === 'highlight-selection')
+    const enabled = () => (items().at(-1)!.menu as { enabled: boolean }).enabled
+    expect(items()).toHaveLength(1)
+    expect(enabled()).toBe(false)
+    selection = { surface: 'markdown', path: 'Notes/A.md', page: 1, text: 'Forest' }
+    changed()
+    expect(items()).toHaveLength(1)
+    activePath = 'Docs/sample.pdf'
+    selection = { surface: 'pdf', path: 'Docs/sample.pdf', page: 2, text: 'Canopy' }
+    changed()
+    expect(items()).toHaveLength(2)
+    expect(enabled()).toBe(true)
+    changed()
+    expect(items()).toHaveLength(2)
+    selection = null
+    changed()
+    expect(enabled()).toBe(false)
+    void dispose()
+  })
+})
+
 describe('SideNotes explicit automation', () => {
   it('validates all public results and observes exact relational restoration', async () => {
     const mock = createMockValleyApi({ manifest: { id: 'sideNotes', noteDocuments: config.noteDocuments, datasets: config.datasets as unknown as ValleyPluginManifest['datasets'] }, files: { 'Notes/A.md': 'Canopy' } })
