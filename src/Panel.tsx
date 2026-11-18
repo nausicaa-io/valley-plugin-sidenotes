@@ -57,6 +57,7 @@ const DEFAULT_DIR: Record<SortField, SortDir> = { position: 'asc', created: 'des
 
 /** Per-file SideNotes — the plugin's `right_sidebar` view. */
 export const Panel = (): ReactElement => {
+  const panel = React.useRef<HTMLDivElement>(null)
   const filePath = useActivePath() ?? ''
   const web = useActiveWebContext()
   // A web tab has no realm file, so `filePath` is empty while a site is focused.
@@ -137,7 +138,7 @@ export const Panel = (): ReactElement => {
     read()
     const off = api.files.onActivePositionChanged(read)
     const isMedia = fileKind === 'video' || fileKind === 'audio'
-    const stop = isMedia ? visibleTimer(document, read, 1000) : undefined
+    const stop = isMedia ? visibleTimer(panel.current?.ownerDocument ?? document, read, 1000, panel.current) : undefined
     return () => {
       off()
       stop?.()
@@ -359,7 +360,7 @@ export const Panel = (): ReactElement => {
   }
 
   return (
-    <div className="sidenotes-panel">
+    <div className="sidenotes-panel" ref={panel}>
       <header className="panel-header sidenotes-header">
         <div className="panel-header-label sidenotes-title">
           {isWeb ? <Globe /> : <StickyNote />}

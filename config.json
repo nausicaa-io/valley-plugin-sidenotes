@@ -324,6 +324,14 @@
   "runtime": {
     "ui": "runtime/index.js",
     "backend": "runtime/backend.js",
+    "activation": {
+      "backend": [
+        "capability"
+      ],
+      "idle": {
+        "stopAfterMs": 600000
+      }
+    },
     "services": [
       {
         "id": "workflow.provider",
