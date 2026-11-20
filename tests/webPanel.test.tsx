@@ -345,7 +345,7 @@ describe('SideNotes Panel — website subject', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Note options' }))
     const deleteItem = mock.menus[0].find((item) => item.label === 'Delete')
-    await act(async () => { await deleteItem?.onSelect?.() })
+    await act(async () => { await deleteItem?.onSelect?.({ newTab: false }) })
 
     expect(vi.mocked(mock.api.ui.confirm).mock.calls[0][0]).toMatchObject({
       title: 'Delete?',
@@ -365,7 +365,7 @@ describe('SideNotes Panel — website subject', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Note options' }))
     const editItem = mock.menus[0].find((item) => item.label === 'Edit')
-    await act(async () => { await editItem?.onSelect?.() })
+    await act(async () => { await editItem?.onSelect?.({ newTab: false }) })
 
     expect(mock.api.workspace.showProperties).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog', { name: 'SideNotes: Edit annotation' })).toBeTruthy()
@@ -391,7 +391,7 @@ describe('SideNotes Panel — website subject', () => {
     await act(async () => render(<Panel />))
     await screen.findByText('page note here')
     fireEvent.click(screen.getByRole('button', { name: 'Note options' }))
-    await act(async () => { await mock.menus[0].find((item) => item.label === 'Edit')?.onSelect?.() })
+    await act(async () => { await mock.menus[0].find((item) => item.label === 'Edit')?.onSelect?.({ newTab: false }) })
     const field = screen.getByLabelText('Annotation')
     expect(field.tagName).toBe('TEXTAREA')
     expect(screen.getByRole('dialog', { name: 'SideNotes: Edit annotation' }).querySelector('.cm-lineNumbers, .cm-editor')).toBeNull()
